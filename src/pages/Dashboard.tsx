@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   addDays,
   startOfDay,
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters'
 import { useSettings } from '@/hooks/useSettings'
 import { ChequeDetail } from '@/components/cheques/ChequeDetail'
+import { ChequeForm } from '@/components/cheques/ChequeForm'
 import { ChequeCalendar } from '@/components/shared/ChequeCalendar'
 import { CurrencyTooltip } from '@/components/shared/ChartTooltip'
 import { STATUS_COLORS, CHART_COLORS, formatChartCurrency, formatMonthLabel } from '@/lib/chartUtils'
@@ -40,8 +41,10 @@ export default function Dashboard() {
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [history, setHistory] = useState<ChequeHistory[]>([])
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [editCheque, setEditCheque] = useState<Cheque | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
 
-  useEffect(() => {
+  const loadDashboardData = useCallback(() => {
     supabase
       .from('cheques')
       .select('*, party:parties(*)')
@@ -58,6 +61,10 @@ export default function Dashboard() {
         if (data) setHistory(data as ChequeHistory[])
       })
   }, [])
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [loadDashboardData])
 
   const today = startOfDay(new Date())
 
@@ -389,8 +396,20 @@ export default function Dashboard() {
         chequeId={detailId}
         open={!!detailId}
         onOpenChange={(o) => !o && setDetailId(null)}
-        onEdit={() => {}}
-        onRefresh={() => {}}
+        onEdit={(c) => { setDetailId(null); setEditCheque(c); setFormOpen(true) }}
+        onRefresh={loadDashboardData}
+      />
+
+      <ChequeForm
+        open={formOpen || !!editCheque}
+        onOpenChange={(o) => { if (!o) { setFormOpen(false); setEditCheque(null) } }}
+        cheque={editCheque}
+        onSubmit={async (data) => {
+          if (!editCheque) return
+          await supabase.from('cheques').update(data).eq('id', editCheque.id)
+          loadDashboardData()
+        }}
+        onStatusChange={loadDashboardData}
       />
     </div>
   )

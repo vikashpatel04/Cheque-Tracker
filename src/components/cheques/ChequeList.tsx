@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Upload, Search, Download, FileText } from 'lucide-react'
+import { Plus, Upload, Search, Download, FileText, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -101,13 +101,14 @@ export function ChequeList() {
                   <th className="p-3">Due Date</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Days Until Due</th>
+                  <th className="p-3 w-12"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Loading...</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading...</td></tr>
                 ) : cheques.length === 0 ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No cheques found</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No cheques found</td></tr>
                 ) : (
                   cheques.map((c) => (
                     <tr key={c.id} className="border-b cursor-pointer hover:bg-muted/30" onClick={() => setDetailId(c.id)}>
@@ -119,6 +120,17 @@ export function ChequeList() {
                       <td className="p-3">{formatDate(c.due_date)}</td>
                       <td className="p-3"><StatusPill status={c.status} /></td>
                       <td className="p-3"><DaysUntilDue dueDate={c.due_date} status={c.status} /></td>
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={`Edit cheque ${c.cheque_number}`}
+                          onClick={() => { setEditCheque(c); setFormOpen(true) }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}

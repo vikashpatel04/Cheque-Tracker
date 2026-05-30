@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Edit } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -17,7 +18,7 @@ export function PartyDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { currencySymbol } = useSettings()
-  const { updateParty } = useParties(true)
+  const { updateParty, softDeleteParty } = useParties(true)
   const [party, setParty] = useState<Party | null>(null)
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [statusFilter, setStatusFilter] = useState<ChequeStatus | 'ALL'>('ALL')
@@ -145,7 +146,7 @@ export function PartyDetail() {
         onOpenChange={setFormOpen}
         party={party}
         onSubmit={async (data) => {
-          await updateParty(party.id, {
+          const result = await updateParty(party.id, {
             name: data.name,
             contact_name: data.contact_name || null,
             phone: data.phone || null,
@@ -153,7 +154,21 @@ export function PartyDetail() {
             notes: data.notes || null,
             is_active: data.is_active,
           })
+          if (result.error) {
+            toast.error(result.error)
+            return
+          }
+          toast.success('Party updated')
           setParty({ ...party, ...data, contact_name: data.contact_name || null, phone: data.phone || null, bank_name: data.bank_name || null, notes: data.notes || null })
+        }}
+        onDelete={async () => {
+          const result = await softDeleteParty(party.id)
+          if (result.error) {
+            toast.error(result.error)
+            throw new Error(result.error)
+          }
+          toast.success(`${party.name} deleted`)
+          navigate('/parties')
         }}
       />
     </div>

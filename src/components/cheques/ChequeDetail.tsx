@@ -25,7 +25,13 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
   const [history, setHistory] = useState<ChequeHistory[]>([])
 
   useEffect(() => {
-    if (!chequeId || !open) return
+    if (!open) {
+      setCheque(null)
+      setHistory([])
+      return
+    }
+    if (!chequeId) return
+    setCheque(null)
     supabase
       .from('cheques')
       .select('*, party:parties(*)')
@@ -75,16 +81,17 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
     onOpenChange(false)
   }
 
-  if (!cheque) return null
-
-  const transitions = VALID_STATUS_TRANSITIONS[cheque.status]
+  const transitions = cheque ? VALID_STATUS_TRANSITIONS[cheque.status] : []
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent className="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Cheque #{cheque.cheque_number}</SheetTitle>
+          <SheetTitle>{cheque ? `Cheque #${cheque.cheque_number}` : 'Cheque Details'}</SheetTitle>
         </SheetHeader>
+        {!cheque ? (
+          <p className="mt-6 text-sm text-muted-foreground">Loading...</p>
+        ) : (
         <div className="mt-6 space-y-4 text-sm">
           <div className="flex items-center justify-between">
             <StatusPill status={cheque.status} />
@@ -132,6 +139,7 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
             <Button variant="destructive" onClick={handleDelete}>Delete</Button>
           </div>
         </div>
+        )}
       </SheetContent>
     </Sheet>
   )

@@ -12,7 +12,7 @@ import { updateChequeStatus } from '@/lib/updateChequeStatus'
 import { todayISO } from '@/lib/formatters'
 import type { Cheque, ChequeStatus } from '@/types'
 import { VALID_STATUS_TRANSITIONS } from '@/types'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const chequeSchema = z.object({
   party_id: z.string().min(1, 'Party is required'),
@@ -40,29 +40,45 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
   const [newStatus, setNewStatus] = useState<ChequeStatus | ''>('')
   const [returnReason, setReturnReason] = useState('')
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, watch } = useForm<ChequeFormData>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, watch, reset } = useForm<ChequeFormData>({
     resolver: zodResolver(chequeSchema),
-    defaultValues: cheque
-      ? {
-          party_id: cheque.party_id,
-          cheque_number: cheque.cheque_number,
-          bank_name: cheque.bank_name,
-          amount: Number(cheque.amount),
-          issue_date: cheque.issue_date,
-          due_date: cheque.due_date,
-          notes: cheque.notes ?? '',
-        }
-      : prefill ?? {
-          issue_date: todayISO(),
-          due_date: todayISO(),
-        },
+    defaultValues: {
+      issue_date: todayISO(),
+      due_date: todayISO(),
+    },
   })
+
+  useEffect(() => {
+    if (!open) {
+      setNewStatus('')
+      setReturnReason('')
+      return
+    }
+    if (cheque) {
+      reset({
+        party_id: cheque.party_id,
+        cheque_number: cheque.cheque_number,
+        bank_name: cheque.bank_name,
+        amount: Number(cheque.amount),
+        issue_date: cheque.issue_date,
+        due_date: cheque.due_date,
+        notes: cheque.notes ?? '',
+      })
+    } else {
+      reset(
+        prefill
+          ? { issue_date: todayISO(), due_date: todayISO(), ...prefill }
+          : { issue_date: todayISO(), due_date: todayISO() }
+      )
+    }
+  }, [open, cheque, prefill, reset])
 
   const partyId = watch('party_id')
   const validTransitions = cheque ? VALID_STATUS_TRANSITIONS[cheque.status] : []
 
   const handleFormSubmit = async (data: ChequeFormData) => {
     if (cheque && newStatus && newStatus !== cheque.status) {
+      if (newStatus === 'RETURNED' && !returnReason.trim()) return
       const result = await updateChequeStatus(cheque.id, newStatus, {
         changedBy: 'manual',
         returnReason: newStatus === 'RETURNED' ? returnReason : undefined,
@@ -76,7 +92,7 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{cheque ? 'Edit Cheque' : 'Add Cheque'}</SheetTitle>
         </SheetHeader>
