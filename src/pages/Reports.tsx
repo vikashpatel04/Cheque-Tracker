@@ -1,0 +1,489 @@
+import { useEffect, useState, useMemo } from 'react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
+import { formatCurrency, formatDate } from '@/lib/formatters'
+import { useSettings } from '@/hooks/useSettings'
+import { useDeposits } from '@/hooks/useDeposits'
+import { CurrencyTooltip } from '@/components/shared/ChartTooltip'
+import { STATUS_COLORS, CHART_COLORS, formatChartCurrency, formatMonthLabel } from '@/lib/chartUtils'
+import type { Cheque } from '@/types'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  Line,
+  ComposedChart,
+  Area,
+  RadialBarChart,
+  RadialBar,
+} from 'recharts'
+
+export default function Reports() {
+  const { currencySymbol } = useSettings()
+  const { deposits } = useDeposits()
+  const [cheques, setCheques] = useState<Cheque[]>([])
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  useEffect(() => {
+    supabase
+      .from('cheques')
+      .select('*, party:parties(*)')
+      .is('deleted_at', null)
+      .then(({ data }) => {
+        if (data) setCheques(data as Cheque[])
+      })
+  }, [])
+
+  const filtered = useMemo(() => {
+    return cheques.filter((c) => {
+      if (dateFrom && c.issue_date < dateFrom) return false
+      if (dateTo && c.issue_date > dateTo) return false
+      return true
+    })
+  }, [cheques, dateFrom, dateTo])
+
+  const monthlyData = useMemo(() => {
+    const months: Record<string, { issued: number; cleared: number; returned: number; count: number }> = {}
+    filtered.forEach((c) => {
+      const month = c.issue_date.slice(0, 7)
+      if (!months[month]) months[month] = { issued: 0, cleared: 0, returned: 0, count: 0 }
+      months[month].issued += Number(c.amount)
+      months[month].count++
+      if (c.status === 'PASSED') months[month].cleared += Number(c.amount)
+      if (c.status === 'RETURNED') months[month].returned += Number(c.amount)
+    })
+    return Object.entries(months)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, data]) => ({
+        month: formatMonthLabel(month),
+        monthKey: month,
+        ...data,
+        netFlow: data.cleared - data.returned,
+      }))
+  }, [filtered])
+
+  const partyData = useMemo(() => {
+    const parties: Record<string, { name: string; issued: number; cleared: number; returned: number; outstanding: number }> = {}
+    filtered.forEach((c) => {
+      const id = c.party_id
+      if (!parties[id]) parties[id] = { name: c.party?.name ?? 'Unknown', issued: 0, cleared: 0, returned: 0, outstanding: 0 }
+      parties[id].issued += Number(c.amount)
+      if (c.status === 'PASSED') parties[id].cleared += Number(c.amount)
+      if (c.status === 'RETURNED') parties[id].returned += Number(c.amount)
+      if (['PENDING', 'DEPOSITED'].includes(c.status)) parties[id].outstanding += Number(c.amount)
+    })
+    return Object.values(parties).sort((a, b) => b.outstanding - a.outstanding)
+  }, [filtered])
+
+  const topPartyChart = partyData.slice(0, 8).map((p) => ({
+    name: p.name.length > 18 ? p.name.slice(0, 16) + '…' : p.name,
+    Outstanding: p.outstanding,
+    Cleared: p.cleared,
+    Returned: p.returned,
+  }))
+
+  const bankData = useMemo(() => {
+    const banks: Record<string, number> = {}
+    filtered.forEach((c) => {
+      banks[c.bank_name] = (banks[c.bank_name] ?? 0) + Number(c.amount)
+    })
+    return Object.entries(banks)
+      .map(([bank, total]) => ({ bank, total, name: bank }))
+      .sort((a, b) => b.total - a.total)
+  }, [filtered])
+
+  const statusData = useMemo(() => {
+    const statuses: Record<string, { count: number; amount: number }> = {}
+    cheques.forEach((c) => {
+      if (!statuses[c.status]) statuses[c.status] = { count: 0, amount: 0 }
+      statuses[c.status].count++
+      statuses[c.status].amount += Number(c.amount)
+    })
+    return Object.entries(statuses).map(([status, data]) => ({
+      status,
+      name: status.charAt(0) + status.slice(1).toLowerCase(),
+      ...data,
+      fill: STATUS_COLORS[status] ?? CHART_COLORS[0],
+    }))
+  }, [cheques])
+
+  const statusCountData = statusData.map((s) => ({ ...s, value: s.count }))
+
+  const depositVsOutflow = useMemo(() => {
+    const byDate: Record<string, { deposits: number; outflow: number }> = {}
+
+    deposits.forEach((d) => {
+      if (!byDate[d.deposit_date]) byDate[d.deposit_date] = { deposits: 0, outflow: 0 }
+      byDate[d.deposit_date].deposits += Number(d.amount)
+    })
+
+    cheques
+      .filter((c) => ['PASSED', 'DEPOSITED'].includes(c.status))
+      .forEach((c) => {
+        const date = c.due_date
+        if (!byDate[date]) byDate[date] = { deposits: 0, outflow: 0 }
+        byDate[date].outflow += Number(c.amount)
+      })
+
+    let cumDeposits = 0
+    let cumOutflow = 0
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-60)
+      .map(([date, data]) => {
+        cumDeposits += data.deposits
+        cumOutflow += data.outflow
+        return {
+          date: formatDate(date),
+          deposits: data.deposits,
+          outflow: data.outflow,
+          cumDeposits,
+          cumOutflow,
+        }
+      })
+  }, [deposits, cheques])
+
+  const summaryStats = useMemo(() => {
+    const totalIssued = filtered.reduce((s, c) => s + Number(c.amount), 0)
+    const totalCleared = filtered.filter((c) => c.status === 'PASSED').reduce((s, c) => s + Number(c.amount), 0)
+    const totalReturned = filtered.filter((c) => c.status === 'RETURNED').reduce((s, c) => s + Number(c.amount), 0)
+    const totalOutstanding = filtered
+      .filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status))
+      .reduce((s, c) => s + Number(c.amount), 0)
+    return { totalIssued, totalCleared, totalReturned, totalOutstanding, count: filtered.length }
+  }, [filtered])
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Reports</h2>
+        <p className="text-sm text-muted-foreground">Detailed analytics and export-ready summaries</p>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {[
+          { label: 'Total Issued', value: formatCurrency(summaryStats.totalIssued, currencySymbol) },
+          { label: 'Cleared', value: formatCurrency(summaryStats.totalCleared, currencySymbol) },
+          { label: 'Outstanding', value: formatCurrency(summaryStats.totalOutstanding, currencySymbol) },
+          { label: 'Returned', value: formatCurrency(summaryStats.totalReturned, currencySymbol) },
+          { label: 'Cheques', value: String(summaryStats.count) },
+        ].map(({ label, value }) => (
+          <Card key={label}>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-lg font-semibold">{value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-4 items-end">
+        <div>
+          <Label>From</Label>
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </div>
+        <div>
+          <Label>To</Label>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </div>
+        <Button variant="outline" onClick={() => { setDateFrom(''); setDateTo('') }}>Clear filters</Button>
+      </div>
+
+      <Tabs defaultValue="monthly">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger value="party">Party-wise</TabsTrigger>
+          <TabsTrigger value="bank">Bank-wise</TabsTrigger>
+          <TabsTrigger value="deposits">Deposits</TabsTrigger>
+          <TabsTrigger value="status">Status</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="monthly" className="space-y-4 mt-4">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Monthly Comparison</CardTitle>
+                <CardDescription>Issued, cleared, and returned by month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Legend />
+                    <Bar dataKey="issued" fill="#3b82f6" name="Issued" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="cleared" fill="#22c55e" name="Cleared" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="returned" fill="#ef4444" name="Returned" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Net Cash Flow</CardTitle>
+                <CardDescription>Cleared minus returned per month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={320}>
+                  <ComposedChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Legend />
+                    <Area type="monotone" dataKey="netFlow" fill="#22c55e" stroke="#22c55e" fillOpacity={0.15} name="Net Flow" />
+                    <Line type="monotone" dataKey="issued" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Issued" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle>Monthly Data Table</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-3 text-left">Month</th>
+                      <th className="p-3 text-right">Cheques</th>
+                      <th className="p-3 text-right">Issued</th>
+                      <th className="p-3 text-right">Cleared</th>
+                      <th className="p-3 text-right">Returned</th>
+                      <th className="p-3 text-right">Net Flow</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyData.map((m) => (
+                      <tr key={m.monthKey} className="border-b">
+                        <td className="p-3 font-medium">{m.month}</td>
+                        <td className="p-3 text-right">{m.count}</td>
+                        <td className="p-3 text-right">{formatCurrency(m.issued, currencySymbol)}</td>
+                        <td className="p-3 text-right text-green-600">{formatCurrency(m.cleared, currencySymbol)}</td>
+                        <td className="p-3 text-right text-red-600">{formatCurrency(m.returned, currencySymbol)}</td>
+                        <td className="p-3 text-right">{formatCurrency(m.netFlow, currencySymbol)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="party" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Parties — Stacked Breakdown</CardTitle>
+              <CardDescription>Outstanding, cleared, and returned for top 8 parties</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={360}>
+                <BarChart data={topPartyChart} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                  <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} />
+                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <Legend />
+                  <Bar dataKey="Outstanding" stackId="a" fill={STATUS_COLORS.PENDING} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="Cleared" stackId="a" fill={STATUS_COLORS.PASSED} />
+                  <Bar dataKey="Returned" stackId="a" fill={STATUS_COLORS.RETURNED} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-3 text-left">Party</th>
+                      <th className="p-3 text-right">Issued</th>
+                      <th className="p-3 text-right">Cleared</th>
+                      <th className="p-3 text-right">Returned</th>
+                      <th className="p-3 text-right">Outstanding</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partyData.map((p) => (
+                      <tr key={p.name} className="border-b">
+                        <td className="p-3 font-medium">{p.name}</td>
+                        <td className="p-3 text-right">{formatCurrency(p.issued, currencySymbol)}</td>
+                        <td className="p-3 text-right">{formatCurrency(p.cleared, currencySymbol)}</td>
+                        <td className="p-3 text-right">{formatCurrency(p.returned, currencySymbol)}</td>
+                        <td className="p-3 text-right font-medium">{formatCurrency(p.outstanding, currencySymbol)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="bank" className="space-y-4 mt-4">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bank Outflow Distribution</CardTitle>
+                <CardDescription>Share of total cheque amounts by bank</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={bankData} dataKey="total" nameKey="bank" cx="50%" cy="50%" outerRadius={100} label={({ bank, percent }) => `${bank} (${(percent * 100).toFixed(0)}%)`}>
+                      {bankData.map((_, i) => (
+                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Bank Rankings</CardTitle>
+                <CardDescription>Total outflow per bank account</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={bankData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="bank" width={100} tick={{ fontSize: 11 }} />
+                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Bar dataKey="total" fill="#3b82f6" name="Total Outflow" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="deposits" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Deposits vs Cheque Outflow</CardTitle>
+              <CardDescription>Daily bank deposits compared to cleared/deposited cheque amounts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={depositVsOutflow}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={6} />
+                  <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <Legend />
+                  <Bar dataKey="deposits" fill="#22c55e" name="Deposits" barSize={8} radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="outflow" fill="#f59e0b" name="Outflow" barSize={8} radius={[2, 2, 0, 0]} />
+                  <Line type="monotone" dataKey="cumDeposits" stroke="#16a34a" strokeWidth={2} dot={false} name="Cum. Deposits" />
+                  <Line type="monotone" dataKey="cumOutflow" stroke="#d97706" strokeWidth={2} dot={false} name="Cum. Outflow" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Deposit Trend</CardTitle>
+              <CardDescription>Daily deposit amounts over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={depositVsOutflow}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={6} />
+                  <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <Area type="monotone" dataKey="deposits" fill="#22c55e" stroke="#22c55e" fillOpacity={0.2} name="Deposits" />
+                  <Line type="monotone" dataKey="deposits" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="status" className="space-y-4 mt-4">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Status by Amount</CardTitle>
+                <CardDescription>Donut chart of current cheque values</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={statusData} dataKey="amount" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3}>
+                      {statusData.map((entry) => (
+                        <Cell key={entry.status} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Status by Count</CardTitle>
+                <CardDescription>Number of cheques in each status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="90%" data={statusCountData} startAngle={180} endAngle={0}>
+                    <RadialBar background dataKey="value" cornerRadius={4}>
+                      {statusCountData.map((entry) => (
+                        <Cell key={entry.status} fill={entry.fill} />
+                      ))}
+                    </RadialBar>
+                    <Legend />
+                    <Tooltip />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {statusData.map((s) => (
+              <Card key={s.status}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.fill }} />
+                    <p className="font-medium text-sm">{s.name}</p>
+                  </div>
+                  <p className="text-lg font-semibold">{formatCurrency(s.amount, currencySymbol)}</p>
+                  <p className="text-xs text-muted-foreground">{s.count} cheques</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
