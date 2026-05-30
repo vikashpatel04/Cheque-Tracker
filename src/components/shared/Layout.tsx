@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { DepositWidget } from '@/components/deposit/DepositWidget'
+import { AppLogo } from '@/components/shared/AppLogo'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,8 +39,7 @@ export function Sidebar() {
   const navContent = (
     <>
       <div className="p-4 border-b">
-        <h1 className="text-lg font-bold tracking-tight">Cheque Tracker</h1>
-        <p className="text-xs text-muted-foreground">Retail Shop Manager</p>
+        <AppLogo size="sm" />
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map(({ to, label, icon: Icon }) => (

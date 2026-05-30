@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
+import { AppLogo } from '@/components/shared/AppLogo'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -44,6 +45,9 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <div className="flex justify-center mb-2">
+            <AppLogo size="lg" showText={false} />
+          </div>
           <CardTitle className="text-2xl">Cheque Tracker</CardTitle>
           <CardDescription>Sign in to manage your cheques</CardDescription>
         </CardHeader>
