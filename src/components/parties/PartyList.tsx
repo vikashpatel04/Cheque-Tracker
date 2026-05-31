@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useParties } from '@/hooks/useParties'
 import { useCheques } from '@/hooks/useCheques'
 import { formatCurrency } from '@/lib/formatters'
@@ -123,77 +124,75 @@ export function PartyList() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left">
-                  <SortableTh
-                    label="Name"
-                    column="name"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onClick={toggleSort}
-                  />
-                  <th className="p-3 font-medium">Contact</th>
-                  <th className="p-3 font-medium">Phone</th>
-                  <th className="p-3 font-medium">Bank</th>
-                  <SortableTh
-                    label="Active Cheques"
-                    column="count"
-                    align="right"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onClick={toggleSort}
-                  />
-                  <SortableTh
-                    label="Outstanding"
-                    column="outstanding"
-                    align="right"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onClick={toggleSort}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="p-6 text-center text-muted-foreground">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-6 text-center text-muted-foreground">
-                      No parties found
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((party) => (
-                    <tr
-                      key={party.id}
-                      className="border-b cursor-pointer hover:bg-muted/30"
-                      onClick={() => navigate(`/parties/${party.id}`)}
-                    >
-                      <td className="p-3 font-medium">
-                        {party.name}
-                        {!party.is_active && (
-                          <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>
-                        )}
-                      </td>
-                      <td className="p-3">{party.contact_name ?? '—'}</td>
-                      <td className="p-3">{party.phone ?? '—'}</td>
-                      <td className="p-3">{party.bank_name ?? '—'}</td>
-                      <td className="p-3 text-right tabular-nums">{party.stats.count}</td>
-                      <td className="p-3 text-right tabular-nums">
-                        {formatCurrency(party.stats.outstanding, currencySymbol)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <SortableTh
+                  label="Name"
+                  column="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onClick={toggleSort}
+                />
+                <TableHead className="p-3 text-foreground">Contact</TableHead>
+                <TableHead className="p-3 text-foreground">Phone</TableHead>
+                <TableHead className="p-3 text-foreground">Bank</TableHead>
+                <SortableTh
+                  label="Active Cheques"
+                  column="count"
+                  align="right"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onClick={toggleSort}
+                />
+                <SortableTh
+                  label="Outstanding"
+                  column="outstanding"
+                  align="right"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onClick={toggleSort}
+                />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="p-6 text-center text-muted-foreground">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="p-6 text-center text-muted-foreground">
+                    No parties found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((party) => (
+                  <TableRow
+                    key={party.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/parties/${party.id}`)}
+                  >
+                    <TableCell className="p-3 font-medium">
+                      {party.name}
+                      {!party.is_active && (
+                        <span className="ml-2 text-xs text-muted-foreground">(inactive)</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="p-3">{party.contact_name ?? '—'}</TableCell>
+                    <TableCell className="p-3">{party.phone ?? '—'}</TableCell>
+                    <TableCell className="p-3">{party.bank_name ?? '—'}</TableCell>
+                    <TableCell className="p-3 text-right tabular-nums">{party.stats.count}</TableCell>
+                    <TableCell className="p-3 text-right tabular-nums">
+                      {formatCurrency(party.stats.outstanding, currencySymbol)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -233,14 +232,16 @@ function SortableTh({ label, column, align = 'left', sortKey, sortDir, onClick }
   const Icon = !active ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown
 
   return (
-    <th className={cn('p-0 font-medium', align === 'right' && 'text-right')}>
-      <button
+    <TableHead
+      className={cn('p-0', align === 'right' && 'text-right')}
+      aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => onClick(column)}
-        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
         className={cn(
-          'group flex w-full items-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors',
-          'hover:bg-muted/70',
+          'group h-auto w-full justify-start rounded-none px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/70',
           align === 'right' && 'justify-end',
           active && 'text-foreground'
         )}
@@ -248,11 +249,11 @@ function SortableTh({ label, column, align = 'left', sortKey, sortDir, onClick }
         <span>{label}</span>
         <Icon
           className={cn(
-            'h-3.5 w-3.5 transition-opacity',
+            'transition-opacity',
             active ? 'opacity-100' : 'opacity-40 group-hover:opacity-80'
           )}
         />
-      </button>
-    </th>
+      </Button>
+    </TableHead>
   )
 }

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useCheques } from '@/hooks/useCheques'
 import { useParties } from '@/hooks/useParties'
 import { useSettings } from '@/hooks/useSettings'
@@ -89,54 +90,56 @@ export function ChequeList() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left">
-                  <th className="p-3">Cheque No.</th>
-                  <th className="p-3">Party</th>
-                  <th className="p-3">Bank</th>
-                  <th className="p-3 text-right">Amount</th>
-                  <th className="p-3">Issue Date</th>
-                  <th className="p-3">Due Date</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Days Until Due</th>
-                  <th className="p-3 w-12"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading...</td></tr>
-                ) : cheques.length === 0 ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No cheques found</td></tr>
-                ) : (
-                  cheques.map((c) => (
-                    <tr key={c.id} className="border-b cursor-pointer hover:bg-muted/30" onClick={() => setDetailId(c.id)}>
-                      <td className="p-3 font-medium">{c.cheque_number}</td>
-                      <td className="p-3">{c.party?.name}</td>
-                      <td className="p-3">{c.bank_name}</td>
-                      <td className="p-3 text-right">{formatCurrency(Number(c.amount), currencySymbol)}</td>
-                      <td className="p-3">{formatDate(c.issue_date)}</td>
-                      <td className="p-3">{formatDate(c.due_date)}</td>
-                      <td className="p-3"><StatusPill status={c.status} /></td>
-                      <td className="p-3"><DaysUntilDue dueDate={c.due_date} status={c.status} /></td>
-                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          aria-label={`Edit cheque ${c.cheque_number}`}
-                          onClick={() => { setEditCheque(c); setFormOpen(true) }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="p-3 text-foreground">Cheque No.</TableHead>
+                <TableHead className="p-3 text-foreground">Party</TableHead>
+                <TableHead className="p-3 text-foreground">Bank</TableHead>
+                <TableHead className="p-3 text-right text-foreground">Amount</TableHead>
+                <TableHead className="p-3 text-foreground">Issue Date</TableHead>
+                <TableHead className="p-3 text-foreground">Due Date</TableHead>
+                <TableHead className="p-3 text-foreground">Status</TableHead>
+                <TableHead className="p-3 text-foreground">Days Until Due</TableHead>
+                <TableHead className="p-3 w-12"><span className="sr-only">Actions</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="p-6 text-center text-muted-foreground">Loading...</TableCell>
+                </TableRow>
+              ) : cheques.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="p-6 text-center text-muted-foreground">No cheques found</TableCell>
+                </TableRow>
+              ) : (
+                cheques.map((c) => (
+                  <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetailId(c.id)}>
+                    <TableCell className="p-3 font-medium">{c.cheque_number}</TableCell>
+                    <TableCell className="p-3">{c.party?.name}</TableCell>
+                    <TableCell className="p-3">{c.bank_name}</TableCell>
+                    <TableCell className="p-3 text-right">{formatCurrency(Number(c.amount), currencySymbol)}</TableCell>
+                    <TableCell className="p-3">{formatDate(c.issue_date)}</TableCell>
+                    <TableCell className="p-3">{formatDate(c.due_date)}</TableCell>
+                    <TableCell className="p-3"><StatusPill status={c.status} /></TableCell>
+                    <TableCell className="p-3"><DaysUntilDue dueDate={c.due_date} status={c.status} /></TableCell>
+                    <TableCell className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label={`Edit cheque ${c.cheque_number}`}
+                        onClick={() => { setEditCheque(c); setFormOpen(true) }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

@@ -1,6 +1,26 @@
 import { useEffect, useState } from 'react'
-import { ResponsiveDrawer } from '@/components/ui/drawer'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters'
 import { useSettings } from '@/hooks/useSettings'
@@ -24,10 +44,22 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
   const [cheque, setCheque] = useState<Cheque | null>(null)
   const [history, setHistory] = useState<ChequeHistory[]>([])
 
+  // Return-reason dialog state — replaces native prompt()
+  const [returnReasonOpen, setReturnReasonOpen] = useState(false)
+  const [returnReason, setReturnReason] = useState('')
+  const [statusSubmitting, setStatusSubmitting] = useState(false)
+
+  // Delete confirmation state — replaces native confirm()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   useEffect(() => {
     if (!open) {
       setCheque(null)
       setHistory([])
+      setReturnReasonOpen(false)
+      setReturnReason('')
+      setDeleteOpen(false)
       return
     }
     if (!chequeId) return
@@ -50,17 +82,14 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
       })
   }, [chequeId, open])
 
-  const handleStatusChange = async (newStatus: ChequeStatus) => {
+  const applyStatusChange = async (newStatus: ChequeStatus, reason?: string) => {
     if (!cheque) return
-    let returnReason: string | undefined
-    if (newStatus === 'RETURNED') {
-      returnReason = prompt('Enter return reason:') ?? undefined
-      if (!returnReason) return
-    }
+    setStatusSubmitting(true)
     const result = await updateChequeStatus(cheque.id, newStatus, {
       changedBy: 'manual',
-      returnReason,
+      returnReason: reason,
     })
+    setStatusSubmitting(false)
     if (result.success) {
       toast.success(`Status updated to ${newStatus}`)
       onRefresh()
@@ -70,12 +99,32 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
     }
   }
 
+  const handleStatusChange = (newStatus: ChequeStatus) => {
+    if (!cheque) return
+    if (newStatus === 'RETURNED') {
+      setReturnReason('')
+      setReturnReasonOpen(true)
+      return
+    }
+    void applyStatusChange(newStatus)
+  }
+
+  const handleConfirmReturn = () => {
+    const trimmed = returnReason.trim()
+    if (!trimmed) return
+    setReturnReasonOpen(false)
+    void applyStatusChange('RETURNED', trimmed)
+  }
+
   const handleDelete = async () => {
-    if (!cheque || !confirm('Soft delete this cheque?')) return
+    if (!cheque) return
+    setDeleting(true)
     await supabase
       .from('cheques')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', cheque.id)
+    setDeleting(false)
+    setDeleteOpen(false)
     toast.success('Cheque deleted')
     onRefresh()
     onOpenChange(false)
@@ -84,62 +133,141 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
   const transitions = cheque ? VALID_STATUS_TRANSITIONS[cheque.status] : []
 
   return (
-    <ResponsiveDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={cheque ? `Cheque #${cheque.cheque_number}` : 'Cheque Details'}
-    >
-      {!cheque ? (
-        <p className="mt-6 text-sm text-muted-foreground">Loading...</p>
-      ) : (
-        <div className="mt-6 space-y-4 text-sm">
-          <div className="flex items-center justify-between">
-            <StatusPill status={cheque.status} />
-            <DaysUntilDue dueDate={cheque.due_date} status={cheque.status} />
-          </div>
-          <div className="grid gap-2">
-            <p><span className="text-muted-foreground">Party:</span> {cheque.party?.name}</p>
-            <p><span className="text-muted-foreground">Bank:</span> {cheque.bank_name}</p>
-            <p><span className="text-muted-foreground">Amount:</span> {formatCurrency(Number(cheque.amount), currencySymbol)}</p>
-            <p><span className="text-muted-foreground">Issue Date:</span> {formatDate(cheque.issue_date)}</p>
-            <p><span className="text-muted-foreground">Due Date:</span> {formatDate(cheque.due_date)}</p>
-            {cheque.return_reason && (
-              <p><span className="text-muted-foreground">Return Reason:</span> {cheque.return_reason}</p>
-            )}
-            {cheque.notes && <p><span className="text-muted-foreground">Notes:</span> {cheque.notes}</p>}
-          </div>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{cheque ? `Cheque #${cheque.cheque_number}` : 'Cheque Details'}</SheetTitle>
+          </SheetHeader>
+          {!cheque ? (
+            <p className="mt-6 text-sm text-muted-foreground">Loading...</p>
+          ) : (
+            <div className="mt-6 space-y-4 text-sm">
+              <div className="flex items-center justify-between">
+                <StatusPill status={cheque.status} />
+                <DaysUntilDue dueDate={cheque.due_date} status={cheque.status} />
+              </div>
+              <div className="grid gap-2">
+                <p><span className="text-muted-foreground">Party:</span> {cheque.party?.name}</p>
+                <p><span className="text-muted-foreground">Bank:</span> {cheque.bank_name}</p>
+                <p><span className="text-muted-foreground">Amount:</span> {formatCurrency(Number(cheque.amount), currencySymbol)}</p>
+                <p><span className="text-muted-foreground">Issue Date:</span> {formatDate(cheque.issue_date)}</p>
+                <p><span className="text-muted-foreground">Due Date:</span> {formatDate(cheque.due_date)}</p>
+                {cheque.return_reason && (
+                  <p><span className="text-muted-foreground">Return Reason:</span> {cheque.return_reason}</p>
+                )}
+                {cheque.notes && <p><span className="text-muted-foreground">Notes:</span> {cheque.notes}</p>}
+              </div>
 
-          {transitions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {transitions.map((s) => (
-                <Button key={s} size="sm" variant="outline" onClick={() => handleStatusChange(s)}>
-                  Mark {s.charAt(0) + s.slice(1).toLowerCase()}
-                </Button>
-              ))}
+              {transitions.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {transitions.map((s) => (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant="outline"
+                      disabled={statusSubmitting}
+                      onClick={() => handleStatusChange(s)}
+                    >
+                      Mark {s.charAt(0) + s.slice(1).toLowerCase()}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              <div>
+                <h4 className="font-medium mb-2">Status History</h4>
+                <div className="space-y-2">
+                  {history.map((h) => (
+                    <div key={h.id} className="border-l-2 border-muted pl-3 py-1">
+                      <p>{h.from_status} → {h.to_status}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {h.changed_by} · {formatDateTime(h.created_at)}
+                      </p>
+                      {h.note && <p className="text-xs">{h.note}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" onClick={() => onEdit(cheque)}>Edit</Button>
+                <Button variant="destructive" onClick={() => setDeleteOpen(true)}>Delete</Button>
+              </div>
             </div>
           )}
+        </SheetContent>
+      </Sheet>
 
-          <div>
-            <h4 className="font-medium mb-2">Status History</h4>
-            <div className="space-y-2">
-              {history.map((h) => (
-                <div key={h.id} className="border-l-2 border-muted pl-3 py-1">
-                  <p>{h.from_status} → {h.to_status}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {h.changed_by} · {formatDateTime(h.created_at)}
-                  </p>
-                  {h.note && <p className="text-xs">{h.note}</p>}
-                </div>
-              ))}
-            </div>
+      {/* Return-reason capture dialog */}
+      <Dialog
+        open={returnReasonOpen}
+        onOpenChange={(o) => {
+          if (statusSubmitting) return
+          setReturnReasonOpen(o)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark cheque as Returned</DialogTitle>
+            <DialogDescription>
+              Add a reason — this is stored with the cheque and shown in its history.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="return-reason">Return reason</Label>
+            <Textarea
+              id="return-reason"
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              placeholder="e.g. Insufficient funds, signature mismatch..."
+              rows={3}
+              autoFocus
+            />
           </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReturnReasonOpen(false)}
+              disabled={statusSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmReturn}
+              disabled={!returnReason.trim() || statusSubmitting}
+            >
+              {statusSubmitting ? 'Saving...' : 'Mark Returned'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={() => onEdit(cheque)}>Edit</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
-          </div>
-        </div>
-      )}
-    </ResponsiveDrawer>
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={(o) => !deleting && setDeleteOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete cheque #{cheque?.cheque_number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This soft-deletes the cheque. Its history is preserved, but it will no
+              longer appear in lists, calendars, or reports.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDelete()
+              }}
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

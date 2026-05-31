@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { suggestAllocation, getRemainingBalance, type AllocationItem } from '@/lib/allocationEngine'
@@ -84,32 +85,30 @@ export function AllocationModal({ depositAmount, notes, onClose, onComplete }: A
         ) : items.length === 0 ? (
           <p className="text-muted-foreground">No pending cheques to allocate.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="p-2 w-10"></th>
-                  <th className="p-2">Party</th>
-                  <th className="p-2">Cheque No.</th>
-                  <th className="p-2 text-right">Amount</th>
-                  <th className="p-2">Due Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => (
-                  <tr key={item.cheque.id} className="border-b">
-                    <td className="p-2">
-                      <Checkbox checked={item.selected} onCheckedChange={() => toggleItem(index)} />
-                    </td>
-                    <td className="p-2">{item.cheque.party.name}</td>
-                    <td className="p-2">{item.cheque.cheque_number}</td>
-                    <td className="p-2 text-right">{formatCurrency(Number(item.cheque.amount), currencySymbol)}</td>
-                    <td className="p-2">{formatDate(item.cheque.due_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="p-2 w-10"></TableHead>
+                <TableHead className="p-2">Party</TableHead>
+                <TableHead className="p-2">Cheque No.</TableHead>
+                <TableHead className="p-2 text-right">Amount</TableHead>
+                <TableHead className="p-2">Due Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item, index) => (
+                <TableRow key={item.cheque.id}>
+                  <TableCell className="p-2">
+                    <Checkbox checked={item.selected} onCheckedChange={() => toggleItem(index)} />
+                  </TableCell>
+                  <TableCell className="p-2">{item.cheque.party.name}</TableCell>
+                  <TableCell className="p-2">{item.cheque.cheque_number}</TableCell>
+                  <TableCell className="p-2 text-right">{formatCurrency(Number(item.cheque.amount), currencySymbol)}</TableCell>
+                  <TableCell className="p-2">{formatDate(item.cheque.due_date)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
 
         <div className="space-y-1 text-sm">

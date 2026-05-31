@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { downloadPartyTemplate, parseExcelFile } from '@/lib/exportUtils'
 import { useParties } from '@/hooks/useParties'
 import { toast } from 'sonner'
@@ -89,32 +92,38 @@ export function PartyBulkUpload({ open, onOpenChange, onComplete }: BulkUploadPr
         {step === 'upload' ? (
           <div className="space-y-4">
             <Button variant="outline" onClick={downloadPartyTemplate}>Download Template</Button>
-            <input type="file" accept=".xlsx,.xls" onChange={handleFile} />
+            <div className="grid w-full max-w-sm items-center gap-2">
+              <Label htmlFor="party-bulk-file">Excel file</Label>
+              <Input
+                id="party-bulk-file"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFile}
+              />
+            </div>
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="p-2 text-left">Name</th>
-                    <th className="p-2 text-left">Contact</th>
-                    <th className="p-2 text-left">Phone</th>
-                    <th className="p-2 text-left">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.map((row, i) => (
-                    <tr key={i} className={row.error ? 'bg-red-50' : ''}>
-                      <td className="p-2">{row.name || '—'}</td>
-                      <td className="p-2">{row.contact_name || '—'}</td>
-                      <td className="p-2">{row.phone || '—'}</td>
-                      <td className="p-2 text-destructive text-xs">{row.error ?? 'Valid'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="p-2">Name</TableHead>
+                  <TableHead className="p-2">Contact</TableHead>
+                  <TableHead className="p-2">Phone</TableHead>
+                  <TableHead className="p-2">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {preview.map((row, i) => (
+                  <TableRow key={i} className={row.error ? 'bg-red-50 dark:bg-red-950/30' : undefined}>
+                    <TableCell className="p-2">{row.name || '—'}</TableCell>
+                    <TableCell className="p-2">{row.contact_name || '—'}</TableCell>
+                    <TableCell className="p-2">{row.phone || '—'}</TableCell>
+                    <TableCell className="p-2 text-destructive text-xs">{row.error ?? 'Valid'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
             {errorCount > 0 && (
               <p className="text-sm text-destructive">{errorCount} row(s) will be skipped</p>
             )}

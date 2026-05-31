@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Party, Cheque, ChequeStatus } from '@/types'
@@ -116,28 +117,26 @@ export function PartyDetail() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left">
-                  <th className="p-3">Cheque No.</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Due Date</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c) => (
-                  <tr key={c.id} className="border-b">
-                    <td className="p-3">{c.cheque_number}</td>
-                    <td className="p-3">{formatCurrency(Number(c.amount), currencySymbol)}</td>
-                    <td className="p-3">{formatDate(c.due_date)}</td>
-                    <td className="p-3"><StatusPill status={c.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="p-3 text-foreground">Cheque No.</TableHead>
+                <TableHead className="p-3 text-foreground">Amount</TableHead>
+                <TableHead className="p-3 text-foreground">Due Date</TableHead>
+                <TableHead className="p-3 text-foreground">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="p-3">{c.cheque_number}</TableCell>
+                  <TableCell className="p-3">{formatCurrency(Number(c.amount), currencySymbol)}</TableCell>
+                  <TableCell className="p-3">{formatDate(c.due_date)}</TableCell>
+                  <TableCell className="p-3"><StatusPill status={c.status} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

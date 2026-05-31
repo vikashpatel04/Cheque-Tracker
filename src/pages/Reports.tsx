@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/formatters'
@@ -405,71 +406,68 @@ export default function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-3 text-left">Date</th>
-                      <th className="p-3 text-left">Day</th>
-                      <th className="p-3 text-right">Cheques</th>
-                      <th className="p-3 text-right">Pending</th>
-                      <th className="p-3 text-right">Deposited</th>
-                      <th className="p-3 text-right">Required</th>
-                      <th className="p-3 text-right">Deposit Log</th>
-                      <th className="p-3 text-right">Gap</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dailyCashFlow.map((d) => {
-                      const shortfall = d.cashRequired > 0 && d.depositLog < d.cashRequired
-                      return (
-                        <tr
-                          key={d.date}
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="p-3 text-foreground">Date</TableHead>
+                    <TableHead className="p-3 text-foreground">Day</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Cheques</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Pending</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Deposited</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Required</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Deposit Log</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Gap</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dailyCashFlow.map((d) => {
+                    const shortfall = d.cashRequired > 0 && d.depositLog < d.cashRequired
+                    return (
+                      <TableRow
+                        key={d.date}
+                        className={cn(
+                          d.isToday && 'bg-primary/5 font-medium',
+                          d.isPast && 'text-muted-foreground'
+                        )}
+                      >
+                        <TableCell className="p-3">
+                          {formatDate(d.date)}
+                          {d.isToday && (
+                            <span className="ml-2 text-[10px] uppercase tracking-wider text-primary font-semibold">
+                              Today
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-3">{d.weekday}</TableCell>
+                        <TableCell className="p-3 text-right tabular-nums">{d.count || '—'}</TableCell>
+                        <TableCell className="p-3 text-right tabular-nums">
+                          {d.pending > 0 ? formatCurrency(d.pending, currencySymbol) : '—'}
+                        </TableCell>
+                        <TableCell className="p-3 text-right tabular-nums">
+                          {d.deposited > 0 ? formatCurrency(d.deposited, currencySymbol) : '—'}
+                        </TableCell>
+                        <TableCell className="p-3 text-right font-medium tabular-nums">
+                          {d.cashRequired > 0 ? formatCurrency(d.cashRequired, currencySymbol) : '—'}
+                        </TableCell>
+                        <TableCell className="p-3 text-right tabular-nums text-emerald-600">
+                          {d.depositLog > 0 ? formatCurrency(d.depositLog, currencySymbol) : '—'}
+                        </TableCell>
+                        <TableCell
                           className={cn(
-                            'border-b',
-                            d.isToday && 'bg-primary/5 font-medium',
-                            d.isPast && 'text-muted-foreground'
+                            'p-3 text-right tabular-nums font-medium',
+                            d.gap < 0 && shortfall && 'text-red-600',
+                            d.gap > 0 && 'text-emerald-600'
                           )}
                         >
-                          <td className="p-3">
-                            {formatDate(d.date)}
-                            {d.isToday && (
-                              <span className="ml-2 text-[10px] uppercase tracking-wider text-primary font-semibold">
-                                Today
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3">{d.weekday}</td>
-                          <td className="p-3 text-right tabular-nums">{d.count || '—'}</td>
-                          <td className="p-3 text-right tabular-nums">
-                            {d.pending > 0 ? formatCurrency(d.pending, currencySymbol) : '—'}
-                          </td>
-                          <td className="p-3 text-right tabular-nums">
-                            {d.deposited > 0 ? formatCurrency(d.deposited, currencySymbol) : '—'}
-                          </td>
-                          <td className="p-3 text-right font-medium tabular-nums">
-                            {d.cashRequired > 0 ? formatCurrency(d.cashRequired, currencySymbol) : '—'}
-                          </td>
-                          <td className="p-3 text-right tabular-nums text-emerald-600">
-                            {d.depositLog > 0 ? formatCurrency(d.depositLog, currencySymbol) : '—'}
-                          </td>
-                          <td
-                            className={cn(
-                              'p-3 text-right tabular-nums font-medium',
-                              d.gap < 0 && shortfall && 'text-red-600',
-                              d.gap > 0 && 'text-emerald-600'
-                            )}
-                          >
-                            {d.cashRequired === 0 && d.depositLog === 0
-                              ? '—'
-                              : formatCurrency(d.gap, currencySymbol)}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          {d.cashRequired === 0 && d.depositLog === 0
+                            ? '—'
+                            : formatCurrency(d.gap, currencySymbol)}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -521,32 +519,30 @@ export default function Reports() {
           <Card>
             <CardHeader><CardTitle>Monthly Data Table</CardTitle></CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-3 text-left">Month</th>
-                      <th className="p-3 text-right">Cheques</th>
-                      <th className="p-3 text-right">Issued</th>
-                      <th className="p-3 text-right">Cleared</th>
-                      <th className="p-3 text-right">Returned</th>
-                      <th className="p-3 text-right">Net Flow</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthlyData.map((m) => (
-                      <tr key={m.monthKey} className="border-b">
-                        <td className="p-3 font-medium">{m.month}</td>
-                        <td className="p-3 text-right">{m.count}</td>
-                        <td className="p-3 text-right">{formatCurrency(m.issued, currencySymbol)}</td>
-                        <td className="p-3 text-right text-green-600">{formatCurrency(m.cleared, currencySymbol)}</td>
-                        <td className="p-3 text-right text-red-600">{formatCurrency(m.returned, currencySymbol)}</td>
-                        <td className="p-3 text-right">{formatCurrency(m.netFlow, currencySymbol)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="p-3 text-foreground">Month</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Cheques</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Issued</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Cleared</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Returned</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Net Flow</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyData.map((m) => (
+                    <TableRow key={m.monthKey}>
+                      <TableCell className="p-3 font-medium">{m.month}</TableCell>
+                      <TableCell className="p-3 text-right">{m.count}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(m.issued, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right text-green-600">{formatCurrency(m.cleared, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right text-red-600">{formatCurrency(m.returned, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(m.netFlow, currencySymbol)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -575,30 +571,28 @@ export default function Reports() {
 
           <Card>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-3 text-left">Party</th>
-                      <th className="p-3 text-right">Issued</th>
-                      <th className="p-3 text-right">Cleared</th>
-                      <th className="p-3 text-right">Returned</th>
-                      <th className="p-3 text-right">Outstanding</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partyData.map((p) => (
-                      <tr key={p.name} className="border-b">
-                        <td className="p-3 font-medium">{p.name}</td>
-                        <td className="p-3 text-right">{formatCurrency(p.issued, currencySymbol)}</td>
-                        <td className="p-3 text-right">{formatCurrency(p.cleared, currencySymbol)}</td>
-                        <td className="p-3 text-right">{formatCurrency(p.returned, currencySymbol)}</td>
-                        <td className="p-3 text-right font-medium">{formatCurrency(p.outstanding, currencySymbol)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="p-3 text-foreground">Party</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Issued</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Cleared</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Returned</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Outstanding</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {partyData.map((p) => (
+                    <TableRow key={p.name}>
+                      <TableCell className="p-3 font-medium">{p.name}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(p.issued, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(p.cleared, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(p.returned, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right font-medium">{formatCurrency(p.outstanding, currencySymbol)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>

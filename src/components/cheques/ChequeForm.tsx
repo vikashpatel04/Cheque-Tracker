@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ResponsiveDrawer } from '@/components/ui/drawer'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -91,82 +91,83 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
   }
 
   return (
-    <ResponsiveDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={cheque ? 'Edit Cheque' : 'Add Cheque'}
-    >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-6 space-y-4">
-        <div>
-          <Label>Party *</Label>
-          <Select value={partyId} onValueChange={(v) => setValue('party_id', v)}>
-            <SelectTrigger><SelectValue placeholder="Select party" /></SelectTrigger>
-            <SelectContent>
-              {parties.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.party_id && <p className="text-sm text-destructive">{errors.party_id.message}</p>}
-        </div>
-        <div>
-          <Label htmlFor="cheque_number">Cheque Number *</Label>
-          <Input id="cheque_number" {...register('cheque_number')} />
-          {errors.cheque_number && <p className="text-sm text-destructive">{errors.cheque_number.message}</p>}
-        </div>
-        <div>
-          <Label htmlFor="bank_name">Bank Name *</Label>
-          <Input id="bank_name" {...register('bank_name')} />
-        </div>
-        <div>
-          <Label htmlFor="amount">Amount *</Label>
-          <Input id="amount" type="number" step="0.01" {...register('amount')} />
-          {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{cheque ? 'Edit Cheque' : 'Add Cheque'}</SheetTitle>
+        </SheetHeader>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-6 space-y-4">
           <div>
-            <Label htmlFor="issue_date">Issue Date</Label>
-            <Input id="issue_date" type="date" {...register('issue_date')} />
-          </div>
-          <div>
-            <Label htmlFor="due_date">Due Date</Label>
-            <Input id="due_date" type="date" {...register('due_date')} />
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="notes">Notes</Label>
-          <Textarea id="notes" {...register('notes')} rows={2} />
-        </div>
-
-        {cheque && validTransitions.length > 0 && (
-          <div>
-            <Label>Change Status</Label>
-            <Select value={newStatus} onValueChange={(v) => setNewStatus(v as ChequeStatus)}>
-              <SelectTrigger><SelectValue placeholder="Keep current status" /></SelectTrigger>
+            <Label>Party *</Label>
+            <Select value={partyId} onValueChange={(v) => setValue('party_id', v)}>
+              <SelectTrigger><SelectValue placeholder="Select party" /></SelectTrigger>
               <SelectContent>
-                {validTransitions.map((s) => (
-                  <SelectItem key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</SelectItem>
+                {parties.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {newStatus === 'RETURNED' && (
-              <div className="mt-2">
-                <Label htmlFor="return_reason">Return Reason *</Label>
-                <Textarea
-                  id="return_reason"
-                  value={returnReason}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  required
-                />
-              </div>
-            )}
+            {errors.party_id && <p className="text-sm text-destructive">{errors.party_id.message}</p>}
           </div>
-        )}
+          <div>
+            <Label htmlFor="cheque_number">Cheque Number *</Label>
+            <Input id="cheque_number" {...register('cheque_number')} />
+            {errors.cheque_number && <p className="text-sm text-destructive">{errors.cheque_number.message}</p>}
+          </div>
+          <div>
+            <Label htmlFor="bank_name">Bank Name *</Label>
+            <Input id="bank_name" {...register('bank_name')} />
+          </div>
+          <div>
+            <Label htmlFor="amount">Amount *</Label>
+            <Input id="amount" type="number" step="0.01" {...register('amount')} />
+            {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="issue_date">Issue Date</Label>
+              <Input id="issue_date" type="date" {...register('issue_date')} />
+            </div>
+            <div>
+              <Label htmlFor="due_date">Due Date</Label>
+              <Input id="due_date" type="date" {...register('due_date')} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea id="notes" {...register('notes')} rows={2} />
+          </div>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : cheque ? 'Update Cheque' : 'Add Cheque'}
-        </Button>
-      </form>
-    </ResponsiveDrawer>
+          {cheque && validTransitions.length > 0 && (
+            <div>
+              <Label>Change Status</Label>
+              <Select value={newStatus} onValueChange={(v) => setNewStatus(v as ChequeStatus)}>
+                <SelectTrigger><SelectValue placeholder="Keep current status" /></SelectTrigger>
+                <SelectContent>
+                  {validTransitions.map((s) => (
+                    <SelectItem key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newStatus === 'RETURNED' && (
+                <div className="mt-2">
+                  <Label htmlFor="return_reason">Return Reason *</Label>
+                  <Textarea
+                    id="return_reason"
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : cheque ? 'Update Cheque' : 'Add Cheque'}
+          </Button>
+        </form>
+      </SheetContent>
+    </Sheet>
   )
 }

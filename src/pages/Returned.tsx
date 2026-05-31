@@ -2,11 +2,22 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { useSettings } from '@/hooks/useSettings'
 import { ChequeForm } from '@/components/cheques/ChequeForm'
 import { useCheques } from '@/hooks/useCheques'
+import { toast } from 'sonner'
 import type { Cheque } from '@/types'
 
 export default function Returned() {
@@ -15,6 +26,9 @@ export default function Returned() {
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [partyFilter, setPartyFilter] = useState('')
   const [rePresentCheque, setRePresentCheque] = useState<Cheque | null>(null)
+  const [writeOffCheque, setWriteOffCheque] = useState<Cheque | null>(null)
+  const [writeOffNote, setWriteOffNote] = useState('')
+  const [writeOffSubmitting, setWriteOffSubmitting] = useState(false)
 
   useEffect(() => {
     let query = supabase
@@ -35,16 +49,31 @@ export default function Returned() {
 
   const totalReturned = filtered.reduce((s, c) => s + Number(c.amount), 0)
 
-  const handleWriteOff = async (cheque: Cheque) => {
-    const note = prompt('Write-off note:')
+  const openWriteOff = (cheque: Cheque) => {
+    setWriteOffCheque(cheque)
+    setWriteOffNote('')
+  }
+
+  const handleConfirmWriteOff = async () => {
+    if (!writeOffCheque) return
+    const note = writeOffNote.trim()
     if (!note) return
-    await supabase
+    setWriteOffSubmitting(true)
+    const { error } = await supabase
       .from('cheques')
       .update({ notes: `[WRITTEN OFF] ${note}` })
-      .eq('id', cheque.id)
+      .eq('id', writeOffCheque.id)
+    setWriteOffSubmitting(false)
+    if (error) {
+      toast.error('Failed to write off cheque')
+      return
+    }
     setCheques((prev) =>
-      prev.map((c) => (c.id === cheque.id ? { ...c, notes: `[WRITTEN OFF] ${note}` } : c))
+      prev.map((c) => (c.id === writeOffCheque.id ? { ...c, notes: `[WRITTEN OFF] ${note}` } : c))
     )
+    toast.success('Cheque written off')
+    setWriteOffCheque(null)
+    setWriteOffNote('')
   }
 
   return (
@@ -88,7 +117,7 @@ export default function Returned() {
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => setRePresentCheque(c)}>Re-present</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleWriteOff(c)}>Write Off</Button>
+                  <Button size="sm" variant="outline" onClick={() => openWriteOff(c)}>Write Off</Button>
                 </div>
               </div>
             </CardContent>
@@ -117,6 +146,56 @@ export default function Returned() {
           }}
         />
       )}
+
+      <Dialog
+        open={!!writeOffCheque}
+        onOpenChange={(o) => {
+          if (writeOffSubmitting) return
+          if (!o) {
+            setWriteOffCheque(null)
+            setWriteOffNote('')
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Write off cheque {writeOffCheque ? `#${writeOffCheque.cheque_number}` : ''}</DialogTitle>
+            <DialogDescription>
+              Add a write-off note. This will be saved to the cheque's notes and prefixed with
+              <span className="font-medium"> [WRITTEN OFF]</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="writeoff-note">Note</Label>
+            <Textarea
+              id="writeoff-note"
+              value={writeOffNote}
+              onChange={(e) => setWriteOffNote(e.target.value)}
+              placeholder="e.g. Party closed business, marked unrecoverable..."
+              rows={3}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWriteOffCheque(null)
+                setWriteOffNote('')
+              }}
+              disabled={writeOffSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmWriteOff}
+              disabled={!writeOffNote.trim() || writeOffSubmitting}
+            >
+              {writeOffSubmitting ? 'Saving...' : 'Write Off'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

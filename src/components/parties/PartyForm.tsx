@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ResponsiveDrawer } from '@/components/ui/drawer'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -80,75 +80,76 @@ export function PartyForm({ open, onOpenChange, party, onSubmit, onDelete }: Par
   }
 
   return (
-    <ResponsiveDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={party ? 'Edit Party' : 'Add Party'}
-    >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-6 space-y-4">
-        <div>
-          <Label htmlFor="name">Party Name *</Label>
-          <Input id="name" {...register('name')} />
-          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-        </div>
-        <div>
-          <Label htmlFor="contact_name">Contact Person</Label>
-          <Input id="contact_name" {...register('contact_name')} />
-        </div>
-        <div>
-          <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" {...register('phone')} />
-        </div>
-        <div>
-          <Label htmlFor="bank_name">Bank Name</Label>
-          <Input id="bank_name" {...register('bank_name')} />
-        </div>
-        <div>
-          <Label htmlFor="notes">Notes</Label>
-          <Textarea id="notes" {...register('notes')} rows={3} />
-        </div>
-        {party && (
-          <div className="flex items-center gap-2">
-            <Switch checked={isActive} onCheckedChange={(v) => setValue('is_active', v)} />
-            <Label>Active</Label>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{party ? 'Edit Party' : 'Add Party'}</SheetTitle>
+        </SheetHeader>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-6 space-y-4">
+          <div>
+            <Label htmlFor="name">Party Name *</Label>
+            <Input id="name" {...register('name')} />
+            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
-        )}
-        <Button type="submit" className="w-full" disabled={isSubmitting || deleting}>
-          {isSubmitting ? 'Saving...' : party ? 'Update Party' : 'Add Party'}
-        </Button>
+          <div>
+            <Label htmlFor="contact_name">Contact Person</Label>
+            <Input id="contact_name" {...register('contact_name')} />
+          </div>
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input id="phone" {...register('phone')} />
+          </div>
+          <div>
+            <Label htmlFor="bank_name">Bank Name</Label>
+            <Input id="bank_name" {...register('bank_name')} />
+          </div>
+          <div>
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea id="notes" {...register('notes')} rows={3} />
+          </div>
+          {party && (
+            <div className="flex items-center gap-2">
+              <Switch checked={isActive} onCheckedChange={(v) => setValue('is_active', v)} />
+              <Label>Active</Label>
+            </div>
+          )}
+          <Button type="submit" className="w-full" disabled={isSubmitting || deleting}>
+            {isSubmitting ? 'Saving...' : party ? 'Update Party' : 'Add Party'}
+          </Button>
 
-        {party && onDelete && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="destructive" className="w-full" disabled={deleting}>
-                Delete Party
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete {party.name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will soft-delete <strong>{party.name}</strong> and hide them from dropdowns.
-                  All cheque history is preserved. This action cannot be undone from the app.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={(e) => {
-                    e.preventDefault()
-                    void handleDelete()
-                  }}
-                  disabled={deleting}
-                  className="bg-destructive text-white hover:bg-destructive/90"
-                >
-                  {deleting ? 'Deleting...' : 'Delete Party'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </form>
-    </ResponsiveDrawer>
+          {party && onDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="destructive" className="w-full" disabled={deleting}>
+                  Delete Party
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {party.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will soft-delete <strong>{party.name}</strong> and hide them from dropdowns.
+                    All cheque history is preserved. This action cannot be undone from the app.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault()
+                      void handleDelete()
+                    }}
+                    disabled={deleting}
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete Party'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </form>
+      </SheetContent>
+    </Sheet>
   )
 }
