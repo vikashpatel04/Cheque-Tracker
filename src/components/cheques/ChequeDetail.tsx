@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { ResponsiveDrawer } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters'
@@ -84,14 +84,14 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
   const transitions = cheque ? VALID_STATUS_TRANSITIONS[cheque.status] : []
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="responsive" className="overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{cheque ? `Cheque #${cheque.cheque_number}` : 'Cheque Details'}</SheetTitle>
-        </SheetHeader>
-        {!cheque ? (
-          <p className="mt-6 text-sm text-muted-foreground">Loading...</p>
-        ) : (
+    <ResponsiveDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={cheque ? `Cheque #${cheque.cheque_number}` : 'Cheque Details'}
+    >
+      {!cheque ? (
+        <p className="mt-6 text-sm text-muted-foreground">Loading...</p>
+      ) : (
         <div className="mt-6 space-y-4 text-sm">
           <div className="flex items-center justify-between">
             <StatusPill status={cheque.status} />
@@ -139,8 +139,7 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
             <Button variant="destructive" onClick={handleDelete}>Delete</Button>
           </div>
         </div>
-        )}
-      </SheetContent>
-    </Sheet>
+      )}
+    </ResponsiveDrawer>
   )
 }
