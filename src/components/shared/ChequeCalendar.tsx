@@ -13,9 +13,9 @@ import { enIN } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency, formatDate } from '@/lib/formatters'
+import { DayChequesDialog } from '@/components/shared/DayChequesDialog'
+import { formatCurrency } from '@/lib/formatters'
 import { STATUS_COLORS } from '@/lib/chartUtils'
-import { StatusPill } from '@/components/shared/StatusPill'
 import type { Cheque } from '@/types'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 
@@ -39,6 +39,12 @@ interface ChequeCalendarProps {
   cheques: Cheque[]
   currencySymbol?: string
   onSelectCheque?: (chequeId: string) => void
+  /**
+   * If provided, clicking a date (or an event in month view) calls this
+   * callback instead of opening the internal day modal. Use this to let a
+   * parent own a shared day-detail dialog.
+   */
+  onDayClick?: (date: Date) => void
   title?: string
   defaultView?: View
   height?: number
@@ -48,13 +54,14 @@ export function ChequeCalendar({
   cheques,
   currencySymbol = '₹',
   onSelectCheque,
+  onDayClick,
   title = 'Cheque Due Calendar',
   defaultView = 'month',
   height = 520,
 }: ChequeCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<View>(defaultView)
-  const [selectedDay, setSelectedDay] = useState<{ date: Date; cheques: Cheque[] } | null>(null)
+  const [internalDay, setInternalDay] = useState<Date | null>(null)
 
   const events = useMemo<CalendarEvent[]>(() => {
     return cheques
@@ -73,6 +80,19 @@ export function ChequeCalendar({
       })
   }, [cheques, currencySymbol])
 
+  // Either delegate to parent or open internal modal
+  const openDay = useCallback(
+    (date: Date) => {
+      const day = startOfDay(date)
+      if (onDayClick) {
+        onDayClick(day)
+      } else {
+        setInternalDay(day)
+      }
+    },
+    [onDayClick]
+  )
+
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     const status = event.resource.status
     const color = STATUS_COLORS[status] ?? '#6b7280'
@@ -85,32 +105,31 @@ export function ChequeCalendar({
         border: 'none',
         fontSize: '11px',
         padding: '1px 4px',
+        cursor: 'pointer',
       },
     }
   }, [])
 
+  // Month view: clicking an event opens the DAY modal (same as date click).
+  // Week / agenda view: clicking an event opens the cheque detail.
   const handleSelectEvent = useCallback(
     (event: CalendarEvent) => {
-      onSelectCheque?.(event.resource.id)
+      if (view === 'month') {
+        openDay(parseISO(event.resource.due_date))
+      } else {
+        onSelectCheque?.(event.resource.id)
+      }
     },
-    [onSelectCheque]
+    [view, openDay, onSelectCheque]
   )
 
   const handleSelectSlot = useCallback(
-    ({ start }: { start: Date }) => {
-      const dateStr = format(start, 'yyyy-MM-dd')
-      const dayCheques = cheques.filter((c) => c.due_date === dateStr)
-      setSelectedDay({ date: start, cheques: dayCheques })
-    },
-    [cheques]
+    ({ start }: { start: Date }) => openDay(start),
+    [openDay]
   )
 
-  const dayTotal = selectedDay
-    ? selectedDay.cheques.reduce((s, c) => s + Number(c.amount), 0)
-    : 0
-
   return (
-    <div className="space-y-4">
+    <>
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -136,7 +155,7 @@ export function ChequeCalendar({
               view={view}
               onNavigate={setCurrentDate}
               onView={setView}
-              views={['month', 'week', 'agenda']}
+              views={['month', 'agenda']}
               eventPropGetter={eventStyleGetter}
               onSelectEvent={handleSelectEvent}
               onSelectSlot={handleSelectSlot}
@@ -147,19 +166,29 @@ export function ChequeCalendar({
                 toolbar: ({ label, onNavigate, onView }) => (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                     <div className="flex items-center gap-1">
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onNavigate('PREV')}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onNavigate('PREV')}
+                      >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => onNavigate('TODAY')}>
                         Today
                       </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onNavigate('NEXT')}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onNavigate('NEXT')}
+                      >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                       <span className="ml-2 font-semibold text-sm">{label}</span>
                     </div>
                     <div className="flex gap-1">
-                      {(['month', 'week', 'agenda'] as View[]).map((v) => (
+                      {(['month', 'agenda'] as View[]).map((v) => (
                         <Button
                           key={v}
                           variant={view === v ? 'default' : 'outline'}
@@ -179,47 +208,17 @@ export function ChequeCalendar({
         </CardContent>
       </Card>
 
-      {selectedDay && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between py-3">
-            <div>
-              <CardTitle className="text-base">{formatDate(format(selectedDay.date, 'yyyy-MM-dd'))}</CardTitle>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {selectedDay.cheques.length} cheque{selectedDay.cheques.length !== 1 ? 's' : ''} ·{' '}
-                {formatCurrency(dayTotal, currencySymbol)} total
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)}>
-              Close
-            </Button>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {selectedDay.cheques.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No cheques due on this date.</p>
-            ) : (
-              <div className="space-y-2">
-                {selectedDay.cheques.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => onSelectCheque?.(c.id)}
-                    className="w-full flex items-center justify-between gap-3 rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{c.party?.name}</p>
-                      <p className="text-xs text-muted-foreground">#{c.cheque_number} · {c.bank_name}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-semibold">{formatCurrency(Number(c.amount), currencySymbol)}</p>
-                      <StatusPill status={c.status} />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Only render the internal dialog if the parent didn't take over */}
+      {!onDayClick && (
+        <DayChequesDialog
+          cheques={cheques}
+          date={internalDay}
+          currencySymbol={currencySymbol}
+          onChangeDate={setInternalDay}
+          onClose={() => setInternalDay(null)}
+          onSelectCheque={onSelectCheque}
+        />
       )}
-    </div>
+    </>
   )
 }

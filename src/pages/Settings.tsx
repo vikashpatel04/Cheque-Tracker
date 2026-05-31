@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   AlertDialog,
@@ -23,6 +24,7 @@ import { toast } from 'sonner'
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettings()
+  const [autoPassEnabled, setAutoPassEnabled] = useState(settings?.auto_pass_enabled ?? true)
   const [autoPassTime, setAutoPassTime] = useState(settings?.auto_pass_time?.slice(0, 5) ?? '23:59')
   const [allocationSort, setAllocationSort] = useState<AllocationSort>(settings?.allocation_sort ?? 'due_date_asc')
   const [currency, setCurrency] = useState(settings?.currency_symbol ?? '₹')
@@ -32,6 +34,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true)
     const result = await updateSettings({
+      auto_pass_enabled: autoPassEnabled,
       auto_pass_time: `${autoPassTime}:00`,
       allocation_sort: allocationSort,
       currency_symbol: currency,
@@ -69,10 +72,39 @@ export default function SettingsPage() {
           <CardTitle>Preferences</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="auto_pass">Auto-pass Time</Label>
-            <Input id="auto_pass" type="time" value={autoPassTime} onChange={(e) => setAutoPassTime(e.target.value)} />
-            <p className="text-xs text-muted-foreground mt-1">Cheques auto-pass at this time on due date</p>
+          <div className="space-y-3 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <Label htmlFor="auto_pass_enabled" className="text-sm font-medium">
+                  Auto-pass cheques on due date
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {autoPassEnabled
+                    ? 'At the scheduled time, any unprocessed cheque due today is marked Passed automatically.'
+                    : 'Unprocessed cheques will roll forward to the next day instead of being auto-marked Passed.'}
+                </p>
+              </div>
+              <Switch
+                id="auto_pass_enabled"
+                checked={autoPassEnabled}
+                onCheckedChange={setAutoPassEnabled}
+              />
+            </div>
+
+            {autoPassEnabled && (
+              <div>
+                <Label htmlFor="auto_pass">Auto-pass time</Label>
+                <Input
+                  id="auto_pass"
+                  type="time"
+                  value={autoPassTime}
+                  onChange={(e) => setAutoPassTime(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Cheques still PENDING / DEPOSITED at this time are marked Passed.
+                </p>
+              </div>
+            )}
           </div>
           <div>
             <Label>Allocation Sort Order</Label>

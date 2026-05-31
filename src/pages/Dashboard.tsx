@@ -2,20 +2,22 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   addDays,
   startOfDay,
-  differenceInDays,
   parseISO,
   format,
   subDays,
 } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters'
+import { formatCurrency, formatDateTime } from '@/lib/formatters'
 import { useSettings } from '@/hooks/useSettings'
+import { useDeposits } from '@/hooks/useDeposits'
 import { ChequeDetail } from '@/components/cheques/ChequeDetail'
 import { ChequeForm } from '@/components/cheques/ChequeForm'
 import { ChequeCalendar } from '@/components/shared/ChequeCalendar'
 import { CurrencyTooltip } from '@/components/shared/ChartTooltip'
+import { TodayPanel } from '@/components/shared/TodayPanel'
+import { Next7DaysStrip } from '@/components/shared/Next7DaysStrip'
+import { DayChequesDialog } from '@/components/shared/DayChequesDialog'
 import { STATUS_COLORS, CHART_COLORS, formatChartCurrency, formatMonthLabel } from '@/lib/chartUtils'
 import type { Cheque, ChequeHistory } from '@/types'
 import {
@@ -38,11 +40,18 @@ import {
 
 export default function Dashboard() {
   const { currencySymbol } = useSettings()
+  const { todayTotal: depositedToday } = useDeposits()
+
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [history, setHistory] = useState<ChequeHistory[]>([])
+
+  // Cheque-level interactions
   const [detailId, setDetailId] = useState<string | null>(null)
   const [editCheque, setEditCheque] = useState<Cheque | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+
+  // Shared day-modal — driven from TodayPanel, Next7DaysStrip, and Calendar
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
   const loadDashboardData = useCallback(() => {
     supabase
@@ -68,12 +77,6 @@ export default function Dashboard() {
 
   const today = startOfDay(new Date())
 
-  const urgentCheques = cheques.filter((c) => {
-    if (c.status !== 'PENDING') return false
-    const days = differenceInDays(startOfDay(parseISO(c.due_date)), today)
-    return days <= 3
-  })
-
   const outstanding = cheques
     .filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status))
     .reduce((s, c) => s + Number(c.amount), 0)
@@ -94,6 +97,11 @@ export default function Dashboard() {
   })
 
   const returnedCount = cheques.filter((c) => c.status === 'RETURNED').length
+
+  const overdueCount = useMemo(() => {
+    const todayStr = format(today, 'yyyy-MM-dd')
+    return cheques.filter((c) => c.status === 'PENDING' && c.due_date < todayStr).length
+  }, [cheques, today])
 
   const calendarDays = useMemo(() => {
     return Array.from({ length: 30 }, (_, i) => {
@@ -176,69 +184,73 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Dashboard</h2>
-        <p className="text-sm text-muted-foreground">Cash flow overview and upcoming cheque liabilities</p>
+        <p className="text-sm text-muted-foreground">
+          Cash flow overview and upcoming cheque liabilities
+        </p>
       </div>
 
-      {urgentCheques.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Urgent — Due in 3 days</h3>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {urgentCheques.map((c) => {
-              const days = differenceInDays(startOfDay(parseISO(c.due_date)), today)
-              return (
-                <Card
-                  key={c.id}
-                  className="min-w-[200px] cursor-pointer shrink-0 hover:shadow-md transition-shadow"
-                  onClick={() => setDetailId(c.id)}
-                >
-                  <CardContent className="p-4">
-                    <p className="font-medium truncate">{c.party?.name}</p>
-                    <p className="text-lg font-semibold">{formatCurrency(Number(c.amount), currencySymbol)}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(c.due_date)}</p>
-                    <Badge
-                      variant={days <= 1 ? 'destructive' : 'secondary'}
-                      className={days === 2 || days === 3 ? 'bg-amber-100 text-amber-800' : ''}
-                    >
-                      {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {/* HERO — answers: how much cash do I need today? */}
+      <TodayPanel
+        cheques={cheques}
+        depositedToday={depositedToday}
+        currencySymbol={currencySymbol}
+        onSelectCheque={setDetailId}
+      />
 
+      {/* 7-day forward strip */}
+      <Next7DaysStrip
+        cheques={cheques}
+        currencySymbol={currencySymbol}
+        onDayClick={setSelectedDay}
+      />
+
+      {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Total Outstanding', value: formatCurrency(outstanding, currencySymbol), sub: `${dueThisMonth.length} due this month` },
+          {
+            label: 'Total Outstanding',
+            value: formatCurrency(outstanding, currencySymbol),
+            sub: `${dueThisMonth.length} due this month`,
+          },
           {
             label: 'Due This Week',
             value: formatCurrency(dueThisWeek.reduce((s, c) => s + Number(c.amount), 0), currencySymbol),
             sub: `${dueThisWeek.length} cheques`,
           },
           {
-            label: 'Due This Month',
-            value: formatCurrency(dueThisMonth.reduce((s, c) => s + Number(c.amount), 0), currencySymbol),
-            sub: `${dueThisMonth.length} cheques`,
+            label: 'Overdue (Pending)',
+            value: String(overdueCount),
+            sub: overdueCount > 0 ? 'review immediately' : 'all clear',
+            tone: overdueCount > 0 ? 'danger' : undefined,
           },
-          { label: 'Needs Attention', value: `${returnedCount}`, sub: 'returned cheques' },
-        ].map(({ label, value, sub }) => (
-          <Card key={label}>
+          {
+            label: 'Returned',
+            value: String(returnedCount),
+            sub: 'needs attention',
+          },
+        ].map(({ label, value, sub, tone }) => (
+          <Card key={label} className={tone === 'danger' ? 'border-red-300/70' : ''}>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-xl font-semibold mt-0.5">{value}</p>
+              <p
+                className={`text-xl font-semibold mt-0.5 ${
+                  tone === 'danger' ? 'text-red-600' : ''
+                }`}
+              >
+                {value}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">{sub}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Monthly calendar */}
+      {/* Monthly calendar — uses lifted day modal */}
       <ChequeCalendar
         cheques={cheques}
         currencySymbol={currencySymbol}
         onSelectCheque={setDetailId}
+        onDayClick={setSelectedDay}
         title="Monthly Cheque Calendar"
       />
 
@@ -254,10 +266,14 @@ export default function Dashboard() {
               <BarChart data={calendarDays}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
-                <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                <YAxis
+                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tick={{ fontSize: 10 }}
+                  width={55}
+                />
                 <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
                 <Legend />
-                <Bar dataKey="pending" stackId="a" fill={STATUS_COLORS.PENDING} name="Pending" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="pending" stackId="a" fill={STATUS_COLORS.PENDING} name="Pending" />
                 <Bar dataKey="deposited" stackId="a" fill={STATUS_COLORS.DEPOSITED} name="Deposited" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -280,9 +296,20 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
-                <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                <YAxis
+                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tick={{ fontSize: 10 }}
+                  width={55}
+                />
                 <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
-                <Area type="monotone" dataKey="cumulative" stroke="#3b82f6" fill="url(#cumGradient)" name="Cumulative" strokeWidth={2} />
+                <Area
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="#3b82f6"
+                  fill="url(#cumGradient)"
+                  name="Cumulative"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -330,7 +357,11 @@ export default function Dashboard() {
               <ComposedChart data={monthlyTrend}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
+                <YAxis
+                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tick={{ fontSize: 10 }}
+                  width={55}
+                />
                 <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
                 <Legend />
                 <Bar dataKey="issued" fill="#3b82f6" name="Issued" barSize={16} radius={[3, 3, 0, 0]} />
@@ -353,7 +384,11 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={Math.max(180, topParties.length * 40)}>
               <BarChart data={topParties} layout="vertical" margin={{ left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tick={{ fontSize: 10 }}
+                />
                 <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
                 <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
                 <Bar dataKey="outstanding" fill="#8b5cf6" name="Outstanding" radius={[0, 4, 4, 0]} />
@@ -364,7 +399,9 @@ export default function Dashboard() {
       )}
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Recent Activity</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Recent Activity</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
           {history.length === 0 ? (
             <p className="text-muted-foreground text-sm">No recent activity</p>
@@ -373,9 +410,17 @@ export default function Dashboard() {
               const cheque = h.cheque as Cheque | undefined
               const partyName = cheque?.party?.name ?? 'Unknown'
               const amount = cheque ? formatCurrency(Number(cheque.amount), currencySymbol) : ''
-              const via = h.changed_by === 'deposit_allocation' ? ' via deposit allocation' : h.changed_by === 'auto' ? ' (auto)' : ''
+              const via =
+                h.changed_by === 'deposit_allocation'
+                  ? ' via deposit allocation'
+                  : h.changed_by === 'auto'
+                  ? ' (auto)'
+                  : ''
               return (
-                <div key={h.id} className="flex items-start gap-3 text-sm border-b pb-2 last:border-0">
+                <div
+                  key={h.id}
+                  className="flex items-start gap-3 text-sm border-b pb-2 last:border-0"
+                >
                   <span
                     className="mt-1.5 h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: STATUS_COLORS[h.to_status] ?? CHART_COLORS[0] }}
@@ -383,7 +428,8 @@ export default function Dashboard() {
                   <p>
                     <span className="font-medium">{amount}</span> cheque to {partyName} marked{' '}
                     {h.to_status.charAt(0) + h.to_status.slice(1).toLowerCase()}
-                    {via} — <span className="text-muted-foreground">{formatDateTime(h.created_at)}</span>
+                    {via} —{' '}
+                    <span className="text-muted-foreground">{formatDateTime(h.created_at)}</span>
                   </p>
                 </div>
               )
@@ -392,17 +438,36 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
+      {/* Shared day-modal — driven by TodayPanel/Strip/Calendar */}
+      <DayChequesDialog
+        cheques={cheques}
+        date={selectedDay}
+        currencySymbol={currencySymbol}
+        onChangeDate={setSelectedDay}
+        onClose={() => setSelectedDay(null)}
+        onSelectCheque={setDetailId}
+      />
+
       <ChequeDetail
         chequeId={detailId}
         open={!!detailId}
         onOpenChange={(o) => !o && setDetailId(null)}
-        onEdit={(c) => { setDetailId(null); setEditCheque(c); setFormOpen(true) }}
+        onEdit={(c) => {
+          setDetailId(null)
+          setEditCheque(c)
+          setFormOpen(true)
+        }}
         onRefresh={loadDashboardData}
       />
 
       <ChequeForm
         open={formOpen || !!editCheque}
-        onOpenChange={(o) => { if (!o) { setFormOpen(false); setEditCheque(null) } }}
+        onOpenChange={(o) => {
+          if (!o) {
+            setFormOpen(false)
+            setEditCheque(null)
+          }
+        }}
         cheque={editCheque}
         onSubmit={async (data) => {
           if (!editCheque) return

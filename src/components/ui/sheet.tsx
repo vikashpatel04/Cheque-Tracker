@@ -30,6 +30,20 @@ const sheetVariants = cva(
         bottom: 'inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         left: 'inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
         right: 'inset-y-0 right-0 h-full w-full border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-md',
+        /**
+         * Responsive: bottom-sheet on mobile, right-side drawer on sm+ screens.
+         * Mobile uses a bottom sheet (max 90vh, rounded top, slides up from
+         * bottom). On `sm+` it overrides to the standard right-side drawer.
+         */
+        responsive: [
+          // Mobile-first: bottom sheet
+          'inset-x-0 bottom-0 max-h-[90vh] rounded-t-2xl border-t overflow-y-auto',
+          'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
+          // sm+ : right-side drawer
+          'sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-full sm:max-w-md',
+          'sm:max-h-none sm:rounded-none sm:border-t-0 sm:border-l',
+          'sm:data-[state=closed]:slide-out-to-right sm:data-[state=open]:slide-in-from-right',
+        ].join(' '),
       },
     },
     defaultVariants: { side: 'right' },

@@ -110,9 +110,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
-      <div className="md:pl-64">
+      <div className="md:pl-64 min-w-0">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/95 backdrop-blur px-4 md:px-6">
           <Button
             variant="ghost"
@@ -123,10 +123,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex-1" />
+          <div className="flex-1 min-w-0" />
           <DepositWidget />
         </header>
-        <main className="p-4 md:p-6">{children}</main>
+        {/* min-w-0 + overflow-x-hidden so tables/charts with `overflow-x-auto`
+            wrappers scroll internally instead of forcing the page to scroll. */}
+        <main className="p-4 md:p-6 min-w-0 overflow-x-hidden">{children}</main>
       </div>
     </div>
   )

@@ -81,7 +81,7 @@ export function PartyForm({ open, onOpenChange, party, onSubmit, onDelete }: Par
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent side="responsive" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{party ? 'Edit Party' : 'Add Party'}</SheetTitle>
         </SheetHeader>

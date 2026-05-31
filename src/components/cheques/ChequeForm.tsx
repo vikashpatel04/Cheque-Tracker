@@ -92,7 +92,7 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent side="responsive" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{cheque ? 'Edit Cheque' : 'Add Cheque'}</SheetTitle>
         </SheetHeader>

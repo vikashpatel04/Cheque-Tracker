@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
+import { addDays, format, startOfDay, subDays } from 'date-fns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { useSettings } from '@/hooks/useSettings'
@@ -28,6 +30,7 @@ import {
   Area,
   RadialBarChart,
   RadialBar,
+  ReferenceLine,
 } from 'recharts'
 
 export default function Reports() {
@@ -166,6 +169,84 @@ export default function Reports() {
     return { totalIssued, totalCleared, totalReturned, totalOutstanding, count: filtered.length }
   }, [filtered])
 
+  /**
+   * 28-day rolling daily cash flow — 14 days back + 14 days forward.
+   * Each row aggregates cheque liabilities and deposits made on that date.
+   */
+  const dailyCashFlow = useMemo(() => {
+    const today = startOfDay(new Date())
+    const todayStr = format(today, 'yyyy-MM-dd')
+
+    // Pre-index deposits by deposit_date for O(1) lookup
+    const depositsByDate: Record<string, number> = {}
+    deposits.forEach((d) => {
+      depositsByDate[d.deposit_date] = (depositsByDate[d.deposit_date] ?? 0) + Number(d.amount)
+    })
+
+    return Array.from({ length: 28 }, (_, i) => {
+      const date = addDays(subDays(today, 14), i)
+      const dateStr = format(date, 'yyyy-MM-dd')
+      const isPast = dateStr < todayStr
+      const isToday = dateStr === todayStr
+      const dayCheques = cheques.filter((c) => c.due_date === dateStr)
+
+      const pending = dayCheques
+        .filter((c) => c.status === 'PENDING')
+        .reduce((s, c) => s + Number(c.amount), 0)
+      const deposited = dayCheques
+        .filter((c) => c.status === 'DEPOSITED')
+        .reduce((s, c) => s + Number(c.amount), 0)
+      const passed = dayCheques
+        .filter((c) => c.status === 'PASSED')
+        .reduce((s, c) => s + Number(c.amount), 0)
+      const returned = dayCheques
+        .filter((c) => c.status === 'RETURNED')
+        .reduce((s, c) => s + Number(c.amount), 0)
+
+      const totalCheques = pending + deposited + passed + returned
+      const depositLog = depositsByDate[dateStr] ?? 0
+      // Gap = cash needed for the day minus cash logged as deposited that day.
+      // For past dates: liability = passed (actually paid that day).
+      // For future dates: liability = pending + deposited (still need funds).
+      const cashRequired = isPast ? passed : pending + deposited
+      const gap = depositLog - cashRequired
+
+      return {
+        date: dateStr,
+        label: format(date, 'dd MMM'),
+        weekday: format(date, 'EEE'),
+        isPast,
+        isToday,
+        count: dayCheques.length,
+        pending,
+        deposited,
+        passed,
+        returned,
+        totalCheques,
+        depositLog,
+        cashRequired,
+        gap,
+      }
+    })
+  }, [cheques, deposits])
+
+  const dailySummary = useMemo(() => {
+    const today = startOfDay(new Date())
+    const todayStr = format(today, 'yyyy-MM-dd')
+    const upcoming = dailyCashFlow.filter((d) => d.date >= todayStr)
+    const past = dailyCashFlow.filter((d) => d.date < todayStr)
+    return {
+      next14Required: upcoming.reduce((s, d) => s + d.cashRequired, 0),
+      next14Cheques: upcoming.reduce((s, d) => s + d.count, 0),
+      past14Required: past.reduce((s, d) => s + d.cashRequired, 0),
+      past14Deposited: past.reduce((s, d) => s + d.depositLog, 0),
+      todayRequired: dailyCashFlow.find((d) => d.isToday)?.cashRequired ?? 0,
+      todayDeposited: dailyCashFlow.find((d) => d.isToday)?.depositLog ?? 0,
+    }
+  }, [dailyCashFlow])
+
+  const todayLabel = useMemo(() => dailyCashFlow.find((d) => d.isToday)?.label, [dailyCashFlow])
+
   return (
     <div className="space-y-6">
       <div>
@@ -203,14 +284,195 @@ export default function Reports() {
         <Button variant="outline" onClick={() => { setDateFrom(''); setDateTo('') }}>Clear filters</Button>
       </div>
 
-      <Tabs defaultValue="monthly">
+      <Tabs defaultValue="daily">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="daily">Daily Cash Flow</TabsTrigger>
           <TabsTrigger value="monthly">Monthly</TabsTrigger>
           <TabsTrigger value="party">Party-wise</TabsTrigger>
           <TabsTrigger value="bank">Bank-wise</TabsTrigger>
           <TabsTrigger value="deposits">Deposits</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="daily" className="space-y-4 mt-4">
+          {/* Quick stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              {
+                label: 'Today',
+                value: formatCurrency(dailySummary.todayRequired, currencySymbol),
+                sub: `${formatCurrency(dailySummary.todayDeposited, currencySymbol)} deposited`,
+                tone:
+                  dailySummary.todayRequired > 0 &&
+                  dailySummary.todayDeposited < dailySummary.todayRequired
+                    ? 'danger'
+                    : undefined,
+              },
+              {
+                label: 'Next 14 days',
+                value: formatCurrency(dailySummary.next14Required, currencySymbol),
+                sub: `${dailySummary.next14Cheques} cheques`,
+              },
+              {
+                label: 'Past 14 days — required',
+                value: formatCurrency(dailySummary.past14Required, currencySymbol),
+                sub: 'cleared cheques',
+              },
+              {
+                label: 'Past 14 days — deposited',
+                value: formatCurrency(dailySummary.past14Deposited, currencySymbol),
+                sub: 'logged deposits',
+              },
+            ].map(({ label, value, sub, tone }) => (
+              <Card key={label} className={tone === 'danger' ? 'border-red-300/70' : ''}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p
+                    className={cn(
+                      'text-lg font-semibold mt-0.5 tabular-nums',
+                      tone === 'danger' && 'text-red-600'
+                    )}
+                  >
+                    {value}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Combined 28-day chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>28-Day Cash Flow</CardTitle>
+              <CardDescription>
+                Cheque liability vs deposits logged — past 14 days and next 14 days, with today marked
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={dailyCashFlow}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={1} />
+                  <YAxis
+                    tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                    tick={{ fontSize: 10 }}
+                    width={55}
+                  />
+                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <Legend />
+                  {todayLabel && (
+                    <ReferenceLine
+                      x={todayLabel}
+                      stroke="#ef4444"
+                      strokeDasharray="3 3"
+                      label={{ value: 'Today', fill: '#ef4444', fontSize: 10, position: 'top' }}
+                    />
+                  )}
+                  <Bar dataKey="pending" stackId="cheques" fill={STATUS_COLORS.PENDING} name="Pending" />
+                  <Bar
+                    dataKey="deposited"
+                    stackId="cheques"
+                    fill={STATUS_COLORS.DEPOSITED}
+                    name="Deposited"
+                  />
+                  <Bar
+                    dataKey="passed"
+                    stackId="cheques"
+                    fill={STATUS_COLORS.PASSED}
+                    name="Passed"
+                    radius={[3, 3, 0, 0]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="depositLog"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Deposit Log"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Day-by-day table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Day-by-day Breakdown</CardTitle>
+              <CardDescription>
+                Past 14 days show cleared amounts; next 14 days show cash you'll need
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-3 text-left">Date</th>
+                      <th className="p-3 text-left">Day</th>
+                      <th className="p-3 text-right">Cheques</th>
+                      <th className="p-3 text-right">Pending</th>
+                      <th className="p-3 text-right">Deposited</th>
+                      <th className="p-3 text-right">Required</th>
+                      <th className="p-3 text-right">Deposit Log</th>
+                      <th className="p-3 text-right">Gap</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyCashFlow.map((d) => {
+                      const shortfall = d.cashRequired > 0 && d.depositLog < d.cashRequired
+                      return (
+                        <tr
+                          key={d.date}
+                          className={cn(
+                            'border-b',
+                            d.isToday && 'bg-primary/5 font-medium',
+                            d.isPast && 'text-muted-foreground'
+                          )}
+                        >
+                          <td className="p-3">
+                            {formatDate(d.date)}
+                            {d.isToday && (
+                              <span className="ml-2 text-[10px] uppercase tracking-wider text-primary font-semibold">
+                                Today
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">{d.weekday}</td>
+                          <td className="p-3 text-right tabular-nums">{d.count || '—'}</td>
+                          <td className="p-3 text-right tabular-nums">
+                            {d.pending > 0 ? formatCurrency(d.pending, currencySymbol) : '—'}
+                          </td>
+                          <td className="p-3 text-right tabular-nums">
+                            {d.deposited > 0 ? formatCurrency(d.deposited, currencySymbol) : '—'}
+                          </td>
+                          <td className="p-3 text-right font-medium tabular-nums">
+                            {d.cashRequired > 0 ? formatCurrency(d.cashRequired, currencySymbol) : '—'}
+                          </td>
+                          <td className="p-3 text-right tabular-nums text-emerald-600">
+                            {d.depositLog > 0 ? formatCurrency(d.depositLog, currencySymbol) : '—'}
+                          </td>
+                          <td
+                            className={cn(
+                              'p-3 text-right tabular-nums font-medium',
+                              d.gap < 0 && shortfall && 'text-red-600',
+                              d.gap > 0 && 'text-emerald-600'
+                            )}
+                          >
+                            {d.cashRequired === 0 && d.depositLog === 0
+                              ? '—'
+                              : formatCurrency(d.gap, currencySymbol)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="monthly" className="space-y-4 mt-4">
           <div className="grid lg:grid-cols-2 gap-6">

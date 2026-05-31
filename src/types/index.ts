@@ -65,6 +65,12 @@ export interface Settings {
   id: string
   user_id: string
   auto_pass_time: string
+  /**
+   * When true, cheques still PENDING/DEPOSITED at the auto-pass time on their
+   * due date are auto-marked PASSED. When false, the cheque stays in its
+   * current status and its due_date is rolled forward by one day.
+   */
+  auto_pass_enabled: boolean
   currency_symbol: string
   allocation_sort: AllocationSort
   created_at: string

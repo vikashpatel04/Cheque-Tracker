@@ -85,7 +85,7 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent side="responsive" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{cheque ? `Cheque #${cheque.cheque_number}` : 'Cheque Details'}</SheetTitle>
         </SheetHeader>
