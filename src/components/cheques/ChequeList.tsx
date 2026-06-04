@@ -1,15 +1,17 @@
 import { useState, useMemo } from 'react'
-import { Plus, Upload, Search, Download, FileText, Pencil } from 'lucide-react'
+import { Plus, Upload, Search, Download, FileText, Pencil, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useCheques } from '@/hooks/useCheques'
 import { useParties } from '@/hooks/useParties'
 import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { exportChequesToPDF, exportChequesToExcel } from '@/lib/exportUtils'
+import { extractTags, TAG_LABELS, TAG_CLASSES } from '@/lib/chequeTags'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { DaysUntilDue } from '@/components/shared/DaysUntilDue'
 import { ChequeForm } from './ChequeForm'
@@ -19,11 +21,16 @@ import type { Cheque, ChequeStatus } from '@/types'
 
 const ALL_STATUSES: ChequeStatus[] = ['PENDING', 'DEPOSITED', 'PASSED', 'RETURNED', 'CANCELLED']
 
+type SortKey = 'due_date' | 'issue_date' | 'amount' | 'party_name'
+type SortDir = 'asc' | 'desc'
+
 export function ChequeList() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ChequeStatus[]>([])
   const [partyFilter, setPartyFilter] = useState('')
   const [bankFilter, setBankFilter] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('due_date')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [formOpen, setFormOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [editCheque, setEditCheque] = useState<Cheque | null>(null)
@@ -39,9 +46,20 @@ export function ChequeList() {
     [statusFilter, partyFilter, bankFilter, search]
   )
 
-  const { cheques, loading, createCheque, updateCheque, fetchCheques } = useCheques(filters)
+  const { cheques: rawCheques, loading, createCheque, updateCheque, fetchCheques } = useCheques(filters)
   const { parties } = useParties()
   const { currencySymbol } = useSettings()
+
+  const cheques = useMemo(() => {
+    return [...rawCheques].sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'due_date') cmp = a.due_date.localeCompare(b.due_date)
+      else if (sortKey === 'issue_date') cmp = a.issue_date.localeCompare(b.issue_date)
+      else if (sortKey === 'amount') cmp = Number(a.amount) - Number(b.amount)
+      else if (sortKey === 'party_name') cmp = (a.party?.name ?? '').localeCompare(b.party?.name ?? '')
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [rawCheques, sortKey, sortDir])
 
   const toggleStatus = (status: ChequeStatus) => {
     setStatusFilter((prev) =>
@@ -86,6 +104,26 @@ export function ChequeList() {
           </SelectContent>
         </Select>
         <Input placeholder="Bank filter" value={bankFilter} onChange={(e) => setBankFilter(e.target.value)} className="w-40" />
+        <div className="flex items-center gap-1 ml-auto">
+          <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+            <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="due_date">Due Date</SelectItem>
+              <SelectItem value="issue_date">Issue Date</SelectItem>
+              <SelectItem value="amount">Amount</SelectItem>
+              <SelectItem value="party_name">Party Name</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
+            aria-label={sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
+          >
+            {sortDir === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -106,18 +144,39 @@ export function ChequeList() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="p-6 text-center text-muted-foreground">Loading...</TableCell>
-                </TableRow>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="p-3 text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-12" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-8 w-8 rounded" /></TableCell>
+                  </TableRow>
+                ))
               ) : cheques.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="p-6 text-center text-muted-foreground">No cheques found</TableCell>
                 </TableRow>
               ) : (
-                cheques.map((c) => (
+                cheques.map((c) => {
+                  const tags = extractTags(c.notes)
+                  return (
                   <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetailId(c.id)}>
                     <TableCell className="p-3 font-medium">{c.cheque_number}</TableCell>
-                    <TableCell className="p-3">{c.party?.name}</TableCell>
+                    <TableCell className="p-3">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span>{c.party?.name}</span>
+                        {tags.map((tag) => (
+                          <span key={tag} className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${TAG_CLASSES[tag]}`}>
+                            {TAG_LABELS[tag]}
+                          </span>
+                        ))}
+                      </div>
+                    </TableCell>
                     <TableCell className="p-3">{c.bank_name}</TableCell>
                     <TableCell className="p-3 text-right">{formatCurrency(Number(c.amount), currencySymbol)}</TableCell>
                     <TableCell className="p-3">{formatDate(c.issue_date)}</TableCell>
@@ -136,7 +195,8 @@ export function ChequeList() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                  )
+                })
               )}
             </TableBody>
           </Table>

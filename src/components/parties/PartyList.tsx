@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDown,
@@ -34,14 +35,14 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
 
 export function PartyList() {
   const navigate = useNavigate()
-  const [showInactive, setShowInactive] = useState(false)
+  const [showActiveOnly, setShowActiveOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
-  const { parties, loading, createParty, fetchParties } = useParties(showInactive)
+  const { parties, loading, createParty, fetchParties } = useParties()
   const { cheques } = useCheques()
   const { currencySymbol } = useSettings()
 
@@ -56,9 +57,11 @@ export function PartyList() {
     })
 
     const term = search.trim().toLowerCase()
-    const filtered = parties.filter((p) =>
-      term === '' ? true : p.name.toLowerCase().includes(term)
-    )
+    const filtered = parties.filter((p) => {
+      if (term && !p.name.toLowerCase().includes(term)) return false
+      if (showActiveOnly && (statsByParty[p.id]?.count ?? 0) === 0) return false
+      return true
+    })
 
     const sorted = [...filtered].sort((a, b) => {
       const aStats = statsByParty[a.id] ?? { count: 0, outstanding: 0 }
@@ -83,7 +86,7 @@ export function PartyList() {
       ...p,
       stats: statsByParty[p.id] ?? { count: 0, outstanding: 0 },
     }))
-  }, [parties, cheques, search, sortKey, sortDir])
+  }, [parties, cheques, search, showActiveOnly, sortKey, sortDir])
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -108,9 +111,9 @@ export function PartyList() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <Switch checked={showInactive} onCheckedChange={setShowInactive} id="inactive" />
-            <Label htmlFor="inactive" className="text-sm">
-              Show inactive
+            <Switch checked={showActiveOnly} onCheckedChange={setShowActiveOnly} id="active-only" />
+            <Label htmlFor="active-only" className="text-sm">
+              Active cheques only
             </Label>
           </div>
           <Button variant="outline" onClick={() => setBulkOpen(true)}>
@@ -157,11 +160,16 @@ export function PartyList() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="p-6 text-center text-muted-foreground">
-                    Loading...
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="p-3"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="p-3 text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                    <TableCell className="p-3 text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
               ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="p-6 text-center text-muted-foreground">

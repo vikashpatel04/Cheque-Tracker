@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { addDays, format, startOfDay, subDays } from 'date-fns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -38,16 +39,19 @@ export default function Reports() {
   const { currencySymbol } = useSettings()
   const { deposits } = useDeposits()
   const [cheques, setCheques] = useState<Cheque[]>([])
+  const [loading, setLoading] = useState(true)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
+    setLoading(true)
     supabase
       .from('cheques')
       .select('*, party:parties(*)')
       .is('deleted_at', null)
       .then(({ data }) => {
         if (data) setCheques(data as Cheque[])
+        setLoading(false)
       })
   }, [])
 
@@ -247,6 +251,37 @@ export default function Reports() {
   }, [dailyCashFlow])
 
   const todayLabel = useMemo(() => dailyCashFlow.find((d) => d.isToday)?.label, [dailyCashFlow])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">Reports</h2>
+          <p className="text-sm text-muted-foreground">Detailed analytics and export-ready summaries</p>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-6 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-[240px] w-full rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

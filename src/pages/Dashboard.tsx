@@ -1,7 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   addDays,
   startOfDay,
+  startOfWeek,
+  endOfWeek,
   parseISO,
   format,
   subDays,
@@ -44,6 +47,7 @@ export default function Dashboard() {
 
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [history, setHistory] = useState<ChequeHistory[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Cheque-level interactions
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -53,22 +57,15 @@ export default function Dashboard() {
   // Shared day-modal — driven from TodayPanel, Next7DaysStrip, and Calendar
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
-  const loadDashboardData = useCallback(() => {
-    supabase
-      .from('cheques')
-      .select('*, party:parties(*)')
-      .is('deleted_at', null)
-      .then(({ data }) => {
-        if (data) setCheques(data as Cheque[])
-      })
-    supabase
-      .from('cheque_history')
-      .select('*, cheque:cheques(*, party:parties(*))')
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        if (data) setHistory(data as ChequeHistory[])
-      })
+  const loadDashboardData = useCallback(async () => {
+    setLoading(true)
+    const [chequesRes, historyRes] = await Promise.all([
+      supabase.from('cheques').select('*, party:parties(*)').is('deleted_at', null),
+      supabase.from('cheque_history').select('*, cheque:cheques(*, party:parties(*))').order('created_at', { ascending: false }).limit(10),
+    ])
+    if (chequesRes.data) setCheques(chequesRes.data as Cheque[])
+    if (historyRes.data) setHistory(historyRes.data as ChequeHistory[])
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -81,13 +78,14 @@ export default function Dashboard() {
     .filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status))
     .reduce((s, c) => s + Number(c.amount), 0)
 
-  const weekEnd = addDays(today, 7)
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 })
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 })
   const monthEnd = addDays(today, 30)
 
   const dueThisWeek = cheques.filter((c) => {
     if (!['PENDING', 'DEPOSITED'].includes(c.status)) return false
     const d = parseISO(c.due_date)
-    return d >= today && d <= weekEnd
+    return d >= weekStart && d <= weekEnd
   })
 
   const dueThisMonth = cheques.filter((c) => {
@@ -190,30 +188,66 @@ export default function Dashboard() {
       </div>
 
       {/* HERO — answers: how much cash do I need today? */}
-      <TodayPanel
-        cheques={cheques}
-        depositedToday={depositedToday}
-        currencySymbol={currencySymbol}
-        onSelectCheque={setDetailId}
-      />
+      {loading ? (
+        <Card className="border-2">
+          <CardContent className="p-5 sm:p-6 space-y-4">
+            <div className="flex justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-8 w-40" />
+              </div>
+              <Skeleton className="h-7 w-28 rounded-full" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <TodayPanel
+          cheques={cheques}
+          depositedToday={depositedToday}
+          currencySymbol={currencySymbol}
+          onSelectCheque={setDetailId}
+        />
+      )}
 
       {/* 7-day forward strip */}
-      <Next7DaysStrip
-        cheques={cheques}
-        currencySymbol={currencySymbol}
-        onDayClick={setSelectedDay}
-      />
+      {loading ? (
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 flex-1 rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <Next7DaysStrip
+          cheques={cheques}
+          currencySymbol={currencySymbol}
+          onDayClick={setSelectedDay}
+        />
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-7 w-20" />
+                <Skeleton className="h-3 w-28" />
+              </CardContent>
+            </Card>
+          ))
+        ) : [
           {
             label: 'Total Outstanding',
             value: formatCurrency(outstanding, currencySymbol),
             sub: `${dueThisMonth.length} due this month`,
           },
           {
-            label: 'Due This Week',
+            label: 'Due This Week (Mon–Sun)',
             value: formatCurrency(dueThisWeek.reduce((s, c) => s + Number(c.amount), 0), currencySymbol),
             sub: `${dueThisWeek.length} cheques`,
           },
@@ -246,16 +280,46 @@ export default function Dashboard() {
       </div>
 
       {/* Monthly calendar — uses lifted day modal */}
-      <ChequeCalendar
-        cheques={cheques}
-        currencySymbol={currencySymbol}
-        onSelectCheque={setDetailId}
-        onDayClick={setSelectedDay}
-        title="Monthly Cheque Calendar"
-      />
+      {loading ? (
+        <Card>
+          <CardContent className="p-4">
+            <Skeleton className="h-6 w-48 mb-4" />
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: 35 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 rounded" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <ChequeCalendar
+          cheques={cheques}
+          currencySymbol={currencySymbol}
+          onSelectCheque={setDetailId}
+          onDayClick={setSelectedDay}
+          title="Monthly Cheque Calendar"
+        />
+      )}
 
       {/* Charts row 1 */}
       <div className="grid lg:grid-cols-2 gap-6">
+        {loading ? (
+          <>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-[280px] w-full rounded" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-[280px] w-full rounded" />
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+        <>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">30-Day Liability Forecast</CardTitle>
@@ -314,10 +378,29 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
 
       {/* Charts row 2 */}
       <div className="grid lg:grid-cols-3 gap-6">
+        {loading ? (
+          <>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-[240px] w-full rounded" />
+              </CardContent>
+            </Card>
+            <Card className="lg:col-span-2">
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-[240px] w-full rounded" />
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+        <>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Status Breakdown</CardTitle>
@@ -371,10 +454,19 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
 
       {/* Top parties */}
-      {topParties.length > 0 && (
+      {loading ? (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-[180px] w-full rounded" />
+          </CardContent>
+        </Card>
+      ) : topParties.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Top Outstanding by Party</CardTitle>
@@ -403,7 +495,14 @@ export default function Dashboard() {
           <CardTitle className="text-base">Recent Activity</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {history.length === 0 ? (
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="h-2 w-2 rounded-full mt-2 shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+              </div>
+            ))
+          ) : history.length === 0 ? (
             <p className="text-muted-foreground text-sm">No recent activity</p>
           ) : (
             history.map((h) => {
