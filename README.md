@@ -1,6 +1,6 @@
 # Cheque Tracker
 
-A React + Supabase web app for managing post-dated cheques — track due dates, parties, deposit logs, and status history from a clean dashboard.
+A React + Supabase web app for managing post-dated cheques - track due dates, parties, deposit logs, and status history from a clean dashboard.
 
 > **AI / MCP layer:** [cheque-mcp](https://github.com/vikashpatel04/cheque-mcp) connects an AI agent (Claude, OpenClaw, etc.) to the same Supabase database so you can query and update cheques in natural language.
 
@@ -8,13 +8,13 @@ A React + Supabase web app for managing post-dated cheques — track due dates, 
 
 ## Features
 
-- **Dashboard** — overview of pending, deposited, overdue, and passed cheques with totals
-- **Cheques** — add, filter, and update cheque status with full transition validation
-- **Parties** — manage the parties (businesses/individuals) associated with cheques
-- **Returns** — dedicated view for returned/bounced cheques
-- **Reports** — export data and view deposit summaries
-- **Calendar** — visualise due dates across a monthly calendar
-- **PDF / Excel export** — generate reports via jsPDF and xlsx
+- **Dashboard** - overview of pending, deposited, overdue, and passed cheques with totals
+- **Cheques** - add, filter, and update cheque status with full transition validation
+- **Parties** - manage the parties (businesses/individuals) associated with cheques
+- **Returns** - dedicated view for returned/bounced cheques
+- **Reports** - export data and view deposit summaries
+- **Calendar** - visualise due dates across a monthly calendar
+- **PDF / Excel export** - generate reports via jsPDF and xlsx
 
 ## Tech Stack
 
@@ -71,22 +71,22 @@ npm run build
 
 ```
 src/
-  pages/          — Dashboard, Cheques, Parties, Reports, Returned, Settings
-  components/     — Shared UI components
-  hooks/          — Custom React hooks
-  lib/            — Supabase client, utilities
-  types/          — TypeScript types
-supabase/         — Database schema and migrations
+  pages/          - Dashboard, Cheques, Parties, Reports, Returned, Settings
+  components/     - Shared UI components
+  hooks/          - Custom React hooks
+  lib/            - Supabase client, utilities
+  types/          - TypeScript types
+supabase/         - Database schema and migrations
 ```
 
 ---
 
 ## Related
 
-- [cheque-mcp](https://github.com/vikashpatel04/cheque-mcp) — MCP server that exposes this app's data to AI agents
+- [cheque-mcp](https://github.com/vikashpatel04/cheque-mcp) - MCP server that exposes this app's data to AI agents
 
 ---
 
 ## License
 
-MIT — see [LICENSE](./LICENSE)
+MIT - see [LICENSE](./LICENSE)
