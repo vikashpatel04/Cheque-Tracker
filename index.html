@@ -7,10 +7,22 @@
     <meta name="theme-color" content="#171717" />
     <link rel="icon" type="image/png" href="/cheque.png" />
     <link rel="apple-touch-icon" href="/cheque.png" />
+    <link rel="manifest" href="/manifest.json" />
     <title>Cheque Tracker</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
