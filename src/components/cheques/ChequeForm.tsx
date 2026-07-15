@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { STATUS_ACTION_META } from './StatusActions'
 import { useParties } from '@/hooks/useParties'
@@ -15,7 +15,7 @@ import { todayISO, formatAmountInput, parseAmount, nextChequeNumber } from '@/li
 import { supabase } from '@/lib/supabase'
 import type { Cheque, ChequeStatus } from '@/types'
 import { VALID_STATUS_TRANSITIONS } from '@/types'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 const chequeSchema = z.object({
   party_id: z.string().min(1, 'Party is required'),
@@ -98,6 +98,11 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
   const partyId = watch('party_id')
   const issueDate = watch('issue_date')
   const dueDate = watch('due_date')
+
+  const partyOptions = useMemo<ComboboxOption[]>(
+    () => parties.map((p) => ({ value: p.id, label: p.name, hint: p.bank_name ?? undefined })),
+    [parties]
+  )
   const validTransitions = cheque ? VALID_STATUS_TRANSITIONS[cheque.status] : []
 
   const handleFormSubmit = async (data: ChequeFormData) => {
@@ -122,15 +127,16 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
         </SheetHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="mt-6 space-y-4">
           <div>
-            <Label>Party *</Label>
-            <Select value={partyId} onValueChange={(v) => setValue('party_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Select party" /></SelectTrigger>
-              <SelectContent>
-                {parties.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="party_id">Party *</Label>
+            <Combobox
+              id="party_id"
+              options={partyOptions}
+              value={partyId}
+              onChange={(v) => setValue('party_id', v, { shouldValidate: true })}
+              placeholder="Select party"
+              searchPlaceholder="Search party..."
+              emptyText="No party found."
+            />
             {errors.party_id && <p className="text-sm text-destructive">{errors.party_id.message}</p>}
           </div>
           <div>
