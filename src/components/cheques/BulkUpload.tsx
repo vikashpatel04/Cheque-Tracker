@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { downloadChequeTemplate, parseExcelFile } from '@/lib/exportUtils'
 import { useParties } from '@/hooks/useParties'
 import { useCheques } from '@/hooks/useCheques'
-import { parseDisplayDate, toISODate } from '@/lib/formatters'
+import { parseFlexibleDate, toISODate } from '@/lib/formatters'
 import { toast } from 'sonner'
 
 interface BulkUploadProps {
@@ -46,9 +46,10 @@ export function ChequeBulkUpload({ open, onOpenChange, onComplete }: BulkUploadP
       const party_name = String(row['Party Name'] ?? '').trim()
       const cheque_number = String(row['Cheque Number'] ?? '').trim()
       const bank_name = String(row['Bank Name'] ?? '').trim()
-      const amount = Number(row['Amount'] ?? 0)
-      const issueStr = String(row['Issue Date (DD-MM-YYYY)'] ?? '').trim()
-      const dueStr = String(row['Due Date (DD-MM-YYYY)'] ?? '').trim()
+      const amount = Number(String(row['Amount'] ?? 0).replace(/,/g, ''))
+      // Accept both the new DD/MM/YYYY headers and older DD-MM-YYYY templates.
+      const issueRaw = row['Issue Date (DD/MM/YYYY)'] ?? row['Issue Date (DD-MM-YYYY)']
+      const dueRaw = row['Due Date (DD/MM/YYYY)'] ?? row['Due Date (DD-MM-YYYY)']
       const notes = String(row['Notes'] ?? '').trim()
 
       let error: string | undefined
@@ -59,8 +60,8 @@ export function ChequeBulkUpload({ open, onOpenChange, onComplete }: BulkUploadP
       if (!bank_name) error = error ?? 'Missing bank name'
       if (!amount || amount <= 0) error = error ?? 'Invalid amount'
 
-      const issueDate = parseDisplayDate(issueStr)
-      const dueDate = parseDisplayDate(dueStr)
+      const issueDate = parseFlexibleDate(issueRaw)
+      const dueDate = parseFlexibleDate(dueRaw)
       if (!issueDate) error = error ?? 'Invalid issue date'
       if (!dueDate) error = error ?? 'Invalid due date'
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -124,11 +125,11 @@ export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePre
 
           <div>
             <Label htmlFor="rp-due-date">New Due Date *</Label>
-            <Input
+            <DatePicker
               id="rp-due-date"
-              type="date"
               value={newDueDate}
-              onChange={(e) => setNewDueDate(e.target.value)}
+              onChange={setNewDueDate}
+              placeholder="Pick a due date"
             />
             {errors.due_date && <p className="text-sm text-destructive mt-1">{errors.due_date}</p>}
           </div>

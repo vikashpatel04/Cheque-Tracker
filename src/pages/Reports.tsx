@@ -3,7 +3,7 @@ import { addDays, format, startOfDay, subDays } from 'date-fns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
+import { DateRangePicker } from '@/components/ui/date-picker'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -310,12 +310,14 @@ export default function Reports() {
 
       <div className="flex flex-wrap gap-4 items-end">
         <div>
-          <Label>From</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div>
-          <Label>To</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <Label>Date range</Label>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onChange={({ from, to }) => { setDateFrom(from); setDateTo(to) }}
+            placeholder="All dates"
+            className="w-64"
+          />
         </div>
         <Button variant="outline" onClick={() => { setDateFrom(''); setDateTo('') }}>Clear filters</Button>
       </div>

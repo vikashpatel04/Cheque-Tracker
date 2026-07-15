@@ -27,11 +27,10 @@ import { useSettings } from '@/hooks/useSettings'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { DaysUntilDue } from '@/components/shared/DaysUntilDue'
 import { Skeleton } from '@/components/ui/skeleton'
-import { updateChequeStatus } from '@/lib/updateChequeStatus'
 import { extractTags, stripTagLines, TAG_LABELS, TAG_CLASSES } from '@/lib/chequeTags'
 import { RePresentDrawer } from './RePresentDrawer'
-import type { Cheque, ChequeHistory, ChequeStatus } from '@/types'
-import { VALID_STATUS_TRANSITIONS } from '@/types'
+import { ChequeStatusActions } from './StatusActions'
+import type { Cheque, ChequeHistory } from '@/types'
 import { toast } from 'sonner'
 
 interface ChequeDetailProps {
@@ -46,11 +45,6 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
   const { currencySymbol } = useSettings()
   const [cheque, setCheque] = useState<Cheque | null>(null)
   const [history, setHistory] = useState<ChequeHistory[]>([])
-
-  // Return-reason dialog state — replaces native prompt()
-  const [returnReasonOpen, setReturnReasonOpen] = useState(false)
-  const [returnReason, setReturnReason] = useState('')
-  const [statusSubmitting, setStatusSubmitting] = useState(false)
 
   // Re-present drawer state
   const [rePresentOpen, setRePresentOpen] = useState(false)
@@ -87,8 +81,6 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
     if (!open) {
       setCheque(null)
       setHistory([])
-      setReturnReasonOpen(false)
-      setReturnReason('')
       setRePresentOpen(false)
       setWriteOffOpen(false)
       setWriteOffNote('')
@@ -115,40 +107,6 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
       })
   }, [chequeId, open])
 
-  const applyStatusChange = async (newStatus: ChequeStatus, reason?: string) => {
-    if (!cheque) return
-    setStatusSubmitting(true)
-    const result = await updateChequeStatus(cheque.id, newStatus, {
-      changedBy: 'manual',
-      returnReason: reason,
-    })
-    setStatusSubmitting(false)
-    if (result.success) {
-      toast.success(`Status updated to ${newStatus}`)
-      onRefresh()
-      onOpenChange(false)
-    } else {
-      toast.error(result.error)
-    }
-  }
-
-  const handleStatusChange = (newStatus: ChequeStatus) => {
-    if (!cheque) return
-    if (newStatus === 'RETURNED') {
-      setReturnReason('')
-      setReturnReasonOpen(true)
-      return
-    }
-    void applyStatusChange(newStatus)
-  }
-
-  const handleConfirmReturn = () => {
-    const trimmed = returnReason.trim()
-    if (!trimmed) return
-    setReturnReasonOpen(false)
-    void applyStatusChange('RETURNED', trimmed)
-  }
-
   const handleDelete = async () => {
     if (!cheque) return
     setDeleting(true)
@@ -162,8 +120,6 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
     onRefresh()
     onOpenChange(false)
   }
-
-  const transitions = cheque ? VALID_STATUS_TRANSITIONS[cheque.status] : []
 
   return (
     <>
@@ -213,21 +169,11 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
                 )}
               </div>
 
-              {transitions.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {transitions.map((s) => (
-                    <Button
-                      key={s}
-                      size="sm"
-                      variant="outline"
-                      disabled={statusSubmitting}
-                      onClick={() => handleStatusChange(s)}
-                    >
-                      Mark {s.charAt(0) + s.slice(1).toLowerCase()}
-                    </Button>
-                  ))}
-                </div>
-              )}
+              <ChequeStatusActions
+                cheque={cheque}
+                onChanged={() => { onRefresh(); onOpenChange(false) }}
+              />
+
 
               <div>
                 <h4 className="font-medium mb-2">Status History</h4>
@@ -297,50 +243,6 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
             <Button variant="outline" onClick={() => { setWriteOffOpen(false); setWriteOffNote('') }} disabled={writeOffSubmitting}>Cancel</Button>
             <Button variant="destructive" onClick={handleConfirmWriteOff} disabled={!writeOffNote.trim() || writeOffSubmitting}>
               {writeOffSubmitting ? 'Saving...' : 'Write Off'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Return-reason capture dialog */}
-      <Dialog
-        open={returnReasonOpen}
-        onOpenChange={(o) => {
-          if (statusSubmitting) return
-          setReturnReasonOpen(o)
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Mark cheque as Returned</DialogTitle>
-            <DialogDescription>
-              Add a reason — this is stored with the cheque and shown in its history.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
-            <Label htmlFor="return-reason">Return reason</Label>
-            <Textarea
-              id="return-reason"
-              value={returnReason}
-              onChange={(e) => setReturnReason(e.target.value)}
-              placeholder="e.g. Insufficient funds, signature mismatch..."
-              rows={3}
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setReturnReasonOpen(false)}
-              disabled={statusSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmReturn}
-              disabled={!returnReason.trim() || statusSubmitting}
-            >
-              {statusSubmitting ? 'Saving...' : 'Mark Returned'}
             </Button>
           </DialogFooter>
         </DialogContent>

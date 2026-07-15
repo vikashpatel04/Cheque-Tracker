@@ -1,7 +1,15 @@
 import { useState, useMemo } from 'react'
-import { Plus, Upload, Search, Download, FileText, Pencil, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Upload, Search, Download, FileText, Pencil, ArrowUp, ArrowDown, MoreVertical, CheckCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -17,7 +25,9 @@ import { DaysUntilDue } from '@/components/shared/DaysUntilDue'
 import { ChequeForm } from './ChequeForm'
 import { ChequeDetail } from './ChequeDetail'
 import { ChequeBulkUpload } from './BulkUpload'
+import { useChequeStatusActions, STATUS_ACTION_META, canChainDepositedAndPassed } from './StatusActions'
 import type { Cheque, ChequeStatus } from '@/types'
+import { VALID_STATUS_TRANSITIONS } from '@/types'
 
 const ALL_STATUSES: ChequeStatus[] = ['PENDING', 'DEPOSITED', 'PASSED', 'RETURNED', 'CANCELLED']
 
@@ -49,6 +59,8 @@ export function ChequeList() {
   const { cheques: rawCheques, loading, createCheque, updateCheque, fetchCheques } = useCheques(filters)
   const { parties } = useParties()
   const { currencySymbol } = useSettings()
+  const { requestStatus, requestChained, submitting: statusSubmitting, returnDialog } =
+    useChequeStatusActions(fetchCheques)
 
   const cheques = useMemo(() => {
     return [...rawCheques].sort((a, b) => {
@@ -184,15 +196,56 @@ export function ChequeList() {
                     <TableCell className="p-3"><StatusPill status={c.status} /></TableCell>
                     <TableCell className="p-3"><DaysUntilDue dueDate={c.due_date} status={c.status} /></TableCell>
                     <TableCell className="p-3" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label={`Edit cheque ${c.cheque_number}`}
-                        onClick={() => { setEditCheque(c); setFormOpen(true) }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Actions for cheque ${c.cheque_number}`}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          {VALID_STATUS_TRANSITIONS[c.status].length > 0 && (
+                            <>
+                              <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Update status
+                              </DropdownMenuLabel>
+                              {VALID_STATUS_TRANSITIONS[c.status].map((s) => {
+                                const { label, Icon, tone } = STATUS_ACTION_META[s]
+                                return (
+                                  <DropdownMenuItem
+                                    key={s}
+                                    disabled={statusSubmitting}
+                                    onSelect={() => requestStatus(c, s)}
+                                    className={tone}
+                                  >
+                                    <Icon className="h-4 w-4" />
+                                    Mark {label}
+                                  </DropdownMenuItem>
+                                )
+                              })}
+                              {canChainDepositedAndPassed(c.status) && (
+                                <DropdownMenuItem
+                                  disabled={statusSubmitting}
+                                  onSelect={() => requestChained(c)}
+                                  className="font-medium"
+                                >
+                                  <CheckCheck className="h-4 w-4" />
+                                  Mark Deposited &amp; Passed
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem onSelect={() => { setEditCheque(c); setFormOpen(true) }}>
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                   )
@@ -227,6 +280,8 @@ export function ChequeList() {
       />
 
       <ChequeBulkUpload open={bulkOpen} onOpenChange={setBulkOpen} onComplete={fetchCheques} />
+
+      {returnDialog}
     </div>
   )
 }
