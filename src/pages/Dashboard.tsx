@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDateTime } from '@/lib/formatters'
 import { useSettings } from '@/hooks/useSettings'
-import { useDeposits } from '@/hooks/useDeposits'
+
 import { ChequeDetail } from '@/components/cheques/ChequeDetail'
 import { ChequeForm } from '@/components/cheques/ChequeForm'
 import { ChequeCalendar } from '@/components/shared/ChequeCalendar'
@@ -43,7 +43,6 @@ import {
 
 export default function Dashboard() {
   const { currencySymbol } = useSettings()
-  const { todayTotal: depositedToday } = useDeposits()
 
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [history, setHistory] = useState<ChequeHistory[]>([])
@@ -98,7 +97,7 @@ export default function Dashboard() {
 
   const overdueCount = useMemo(() => {
     const todayStr = format(today, 'yyyy-MM-dd')
-    return cheques.filter((c) => c.status === 'PENDING' && c.due_date < todayStr).length
+    return cheques.filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status) && c.due_date < todayStr).length
   }, [cheques, today])
 
   const calendarDays = useMemo(() => {
@@ -207,7 +206,6 @@ export default function Dashboard() {
       ) : (
         <TodayPanel
           cheques={cheques}
-          depositedToday={depositedToday}
           currencySymbol={currencySymbol}
           onSelectCheque={setDetailId}
         />
@@ -252,7 +250,7 @@ export default function Dashboard() {
             sub: `${dueThisWeek.length} cheques`,
           },
           {
-            label: 'Overdue (Pending)',
+            label: 'Overdue',
             value: String(overdueCount),
             sub: overdueCount > 0 ? 'review immediately' : 'all clear',
             tone: overdueCount > 0 ? 'danger' : undefined,

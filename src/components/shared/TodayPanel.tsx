@@ -3,23 +3,20 @@ import { format, startOfDay } from 'date-fns'
 import {
   AlertTriangle,
   ArrowRight,
+  Calendar,
   CheckCircle2,
-  Info,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
+  Clock,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
+import { getOverdueTag, OVERDUE_TAG_LABELS, OVERDUE_TAG_CLASSES } from '@/lib/chequeTags'
 import type { Cheque } from '@/types'
 
 interface TodayPanelProps {
   cheques: Cheque[]
-  /** Sum of `daily_deposits` already logged for today. */
-  depositedToday: number
   currencySymbol?: string
   onSelectCheque?: (chequeId: string) => void
 }
@@ -27,17 +24,19 @@ interface TodayPanelProps {
 /**
  * Hero panel — first thing the user sees on the dashboard.
  *
- * Answers: "How much cash do I need today, and am I covered?"
+ * Answers: "What cheques need attention today?"
  *
- * - Cash needed = sum of cheques due today still in PENDING.
- * - Deposited today = sum of `daily_deposits` rows logged today
- *   (manually entered or via allocation).
- * - Already in bank = cheques due today that are already DEPOSITED.
- * - Overdue = PENDING cheques whose due_date is before today.
+ * Layout:
+ * - Single "Cash Needed Today" stat (today's pending + all overdue amounts)
+ * - Combined cheque list:
+ *   1. "Today's Cheques" — due today, status PENDING or DEPOSITED
+ *   2. "Overdue Cheques" — due before today, status PENDING or DEPOSITED
+ *     each with an "Overdue" or "Overdue · Deposited" tag and original due date
+ *
+ * PASSED cheques are completely done — never shown here.
  */
 export function TodayPanel({
   cheques,
-  depositedToday,
   currencySymbol = '₹',
   onSelectCheque,
 }: TodayPanelProps) {
@@ -45,24 +44,24 @@ export function TodayPanel({
   const todayStr = format(today, 'yyyy-MM-dd')
   const dayName = format(today, 'EEEE')
 
-  const todayPending = cheques.filter(
-    (c) => c.due_date === todayStr && c.status === 'PENDING'
+  // Today's cheques — due today and still pending or deposited
+  const todayCheques = cheques.filter(
+    (c) => c.due_date === todayStr && ['PENDING', 'DEPOSITED'].includes(c.status)
   )
-  const todayDeposited = cheques.filter(
-    (c) => c.due_date === todayStr && c.status === 'DEPOSITED'
-  )
+
+  // Overdue cheques — due before today and still pending or deposited
   const overdue = cheques.filter(
-    (c) => c.status === 'PENDING' && c.due_date < todayStr
+    (c) => c.due_date < todayStr && ['PENDING', 'DEPOSITED'].includes(c.status)
   )
 
-  const cashNeeded = todayPending.reduce((s, c) => s + Number(c.amount), 0)
-  const inBank = todayDeposited.reduce((s, c) => s + Number(c.amount), 0)
-  const overdueAmount = overdue.reduce((s, c) => s + Number(c.amount), 0)
-  const gap = depositedToday - cashNeeded // positive = surplus
+  const todayAmount = todayCheques.filter((c) => c.status === 'PENDING').reduce((s, c) => s + Number(c.amount), 0)
+  const overdueAmount = overdue.filter((c) => c.status === 'PENDING').reduce((s, c) => s + Number(c.amount), 0)
+  const totalCashNeeded = todayAmount + overdueAmount
+  const totalCount = todayCheques.length + overdue.length
 
-  type BannerState = 'no-cheques' | 'covered' | 'short'
+  type BannerState = 'no-cheques' | 'has-overdue' | 'today-only'
   const bannerState: BannerState =
-    cashNeeded === 0 ? 'no-cheques' : gap >= 0 ? 'covered' : 'short'
+    totalCount === 0 ? 'no-cheques' : overdue.length > 0 ? 'has-overdue' : 'today-only'
 
   return (
     <Card className="border-2">
@@ -86,136 +85,142 @@ export function TodayPanel({
               <CheckCircle2 className="h-3.5 w-3.5" /> No cheques due today
             </Badge>
           )}
-          {bannerState === 'covered' && (
-            <Badge
-              variant="secondary"
-              className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 gap-1.5 self-start"
-            >
-              <TrendingUp className="h-3.5 w-3.5" />
-              Covered
-              {gap > 0 && ` · ${formatCurrency(gap, currencySymbol)} surplus`}
+          {bannerState === 'has-overdue' && (
+            <Badge variant="destructive" className="gap-1.5 self-start">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {overdue.length} overdue
             </Badge>
           )}
-          {bannerState === 'short' && (
-            <Badge variant="destructive" className="gap-1.5 self-start">
-              <TrendingDown className="h-3.5 w-3.5" />
-              Short by {formatCurrency(Math.abs(gap), currencySymbol)}
+          {bannerState === 'today-only' && (
+            <Badge
+              variant="secondary"
+              className="bg-amber-100 text-amber-800 hover:bg-amber-100 gap-1.5 self-start"
+            >
+              <Clock className="h-3.5 w-3.5" />
+              {todayCheques.length} cheque{todayCheques.length !== 1 ? 's' : ''} due
             </Badge>
           )}
         </div>
 
-        {/* Big numbers — the answer to the core question.
-            Two cards only; we intentionally do NOT show a "bank balance" card
-            because daily_deposits is not the actual bank balance (cash may be
-            spent elsewhere). Cheques already submitted to the bank for today
-            are surfaced as a small inline note below instead. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+        {/* Single stat block — Cash Needed Today */}
+        <div className="mt-5">
           <StatBlock
             label="Cash needed today"
-            value={formatCurrency(cashNeeded, currencySymbol)}
-            sub={`${todayPending.length} pending cheque${todayPending.length !== 1 ? 's' : ''}`}
+            value={formatCurrency(totalCashNeeded, currencySymbol)}
+            sub={
+              overdue.length > 0
+                ? `${todayCheques.length} today · ${overdue.length} overdue · ${totalCount} total`
+                : `${todayCheques.length} cheque${todayCheques.length !== 1 ? 's' : ''} due today`
+            }
             tone="amber"
             primary
           />
-          <StatBlock
-            label="Deposited today"
-            value={formatCurrency(depositedToday, currencySymbol)}
-            sub="From daily deposit log"
-            tone="emerald"
-            icon={<Wallet className="h-3.5 w-3.5" />}
-          />
         </div>
 
-        {/* Awaiting clearance — shown only when relevant, as a low-emphasis line */}
-        {todayDeposited.length > 0 && (
-          <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-600" />
-            <span>
-              <span className="font-medium text-foreground">
-                {todayDeposited.length} cheque{todayDeposited.length !== 1 ? 's' : ''}
-              </span>{' '}
-              for today already submitted to the bank ·{' '}
-              {formatCurrency(inBank, currencySymbol)} awaiting clearance
-            </span>
-          </p>
-        )}
-
-        {/* Today's pending cheques — actionable list */}
-        {todayPending.length > 0 && (
+        {/* Today's cheques */}
+        {todayCheques.length > 0 && (
           <div className="mt-5">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-              Pending cheques due today
+              Today's Cheques
             </p>
             <div className="space-y-2">
-              {todayPending.map((c) => (
-                <button
+              {todayCheques.map((c) => (
+                <ChequeRow
                   key={c.id}
-                  type="button"
-                  onClick={() => onSelectCheque?.(c.id)}
-                  className="w-full flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 active:bg-muted transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">
-                      {c.party?.name ?? 'Unknown'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      #{c.cheque_number} · {c.bank_name}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="text-right">
-                      <p className="font-semibold">
-                        {formatCurrency(Number(c.amount), currencySymbol)}
-                      </p>
-                      <StatusPill status={c.status} />
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
+                  cheque={c}
+                  currencySymbol={currencySymbol}
+                  onSelect={onSelectCheque}
+                />
               ))}
             </div>
           </div>
         )}
 
-        {/* Overdue alert */}
+        {/* Overdue cheques */}
         {overdue.length > 0 && (
-          <div className="mt-4 rounded-lg border border-red-300/70 bg-red-50 dark:bg-red-950/20 p-3">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-                  {overdue.length} overdue cheque
-                  {overdue.length !== 1 ? 's' : ''} ·{' '}
-                  {formatCurrency(overdueAmount, currencySymbol)}
-                </p>
-                <p className="text-xs text-red-600/80 dark:text-red-300/80 mt-0.5">
-                  Still pending past their due date. Review and update status.
-                </p>
-                <div className="mt-2 space-y-1">
-                  {overdue.slice(0, 3).map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => onSelectCheque?.(c.id)}
-                      className="block text-xs text-red-700 dark:text-red-300 hover:underline text-left"
-                    >
-                      <span className="font-medium">{c.party?.name}</span> ·{' '}
-                      {formatCurrency(Number(c.amount), currencySymbol)} (was due{' '}
-                      {formatDate(c.due_date)})
-                    </button>
-                  ))}
-                  {overdue.length > 3 && (
-                    <p className="text-xs text-red-600/70 dark:text-red-300/70">
-                      + {overdue.length - 3} more
-                    </p>
-                  )}
-                </div>
-              </div>
+          <div className="mt-5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-orange-600" />
+              Overdue Cheques · {formatCurrency(overdueAmount, currencySymbol)}
+            </p>
+            <div className="space-y-2">
+              {overdue.map((c) => (
+                <ChequeRow
+                  key={c.id}
+                  cheque={c}
+                  currencySymbol={currencySymbol}
+                  onSelect={onSelectCheque}
+                  showOverdueTag
+                />
+              ))}
             </div>
           </div>
         )}
+
+        {/* Empty state */}
+        {totalCount === 0 && (
+          <p className="mt-4 text-sm text-muted-foreground text-center py-4">
+            No pending or overdue cheques — you're all clear! 🎉
+          </p>
+        )}
       </CardContent>
     </Card>
+  )
+}
+
+/* ---------- Cheque row component ---------- */
+
+interface ChequeRowProps {
+  cheque: Cheque
+  currencySymbol: string
+  onSelect?: (chequeId: string) => void
+  showOverdueTag?: boolean
+}
+
+function ChequeRow({ cheque, currencySymbol, onSelect, showOverdueTag }: ChequeRowProps) {
+  const overdueTag = showOverdueTag ? getOverdueTag(cheque) : null
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect?.(cheque.id)}
+      className="w-full flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 active:bg-muted transition-colors"
+    >
+      <div className="min-w-0">
+        <p className="font-medium truncate">
+          {cheque.party?.name ?? 'Unknown'}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          #{cheque.cheque_number} · {cheque.bank_name}
+        </p>
+        {overdueTag && (
+          <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5 flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            Was due {formatDate(cheque.due_date)}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="text-right">
+          <p className="font-semibold">
+            {formatCurrency(Number(cheque.amount), currencySymbol)}
+          </p>
+          {overdueTag ? (
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                OVERDUE_TAG_CLASSES[overdueTag]
+              )}
+            >
+              {OVERDUE_TAG_LABELS[overdueTag]}
+            </span>
+          ) : (
+            <StatusPill status={cheque.status} />
+          )}
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      </div>
+    </button>
   )
 }
 

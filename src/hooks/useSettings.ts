@@ -4,7 +4,7 @@ import type { Settings, AllocationSort } from '@/types'
 
 const DEFAULT_SETTINGS: Omit<Settings, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
   auto_pass_time: '23:59:00',
-  auto_pass_enabled: true,
+  auto_pass_enabled: false,
   currency_symbol: '₹',
   allocation_sort: 'due_date_asc',
 }

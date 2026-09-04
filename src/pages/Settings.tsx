@@ -24,7 +24,7 @@ import { toast } from 'sonner'
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettings()
-  const [autoPassEnabled, setAutoPassEnabled] = useState(settings?.auto_pass_enabled ?? true)
+  const [autoPassEnabled, setAutoPassEnabled] = useState(settings?.auto_pass_enabled ?? false)
   const [autoPassTime, setAutoPassTime] = useState(settings?.auto_pass_time?.slice(0, 5) ?? '23:59')
   const [allocationSort, setAllocationSort] = useState<AllocationSort>(settings?.allocation_sort ?? 'due_date_asc')
   const [currency, setCurrency] = useState(settings?.currency_symbol ?? '₹')
@@ -76,12 +76,12 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <Label htmlFor="auto_pass_enabled" className="text-sm font-medium">
-                  Auto-pass cheques on due date
+                  Auto-pass deposited cheques on due date
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {autoPassEnabled
-                    ? 'At the scheduled time, any unprocessed cheque due today is marked Passed automatically.'
-                    : 'Unprocessed cheques will roll forward to the next day instead of being auto-marked Passed.'}
+                    ? 'At the scheduled time, deposited cheques past their due date are marked Passed automatically.'
+                    : 'Deposited cheques will stay in their current status until you manually mark them Passed. Pending cheques always require manual action.'}
                 </p>
               </div>
               <Switch
@@ -101,7 +101,7 @@ export default function SettingsPage() {
                   onChange={(e) => setAutoPassTime(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Cheques still PENDING / DEPOSITED at this time are marked Passed.
+                  Deposited cheques past their due date are marked Passed after this time.
                 </p>
               </div>
             )}

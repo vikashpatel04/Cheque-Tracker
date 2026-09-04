@@ -6,16 +6,16 @@ const corsHeaders = {
 }
 
 /**
- * Daily job — for each user, looks at every PENDING / DEPOSITED cheque whose
- * due_date <= today and auto_transition_blocked = false, then either:
+ * Daily job — for each user, looks at every DEPOSITED cheque whose
+ * due_date <= today and auto_transition_blocked = false, then:
  *
  *   - auto_pass_enabled = true  → marks the cheque PASSED (history row written)
- *   - auto_pass_enabled = false → rolls the cheque's due_date forward by 1 day
- *                                  (no status change, no history row — the
- *                                  cheque simply re-surfaces tomorrow)
+ *   - auto_pass_enabled = false → does nothing (cheque keeps its date and status)
  *
- * The job still respects auto_pass_time: it runs only after the user's
- * configured cutoff time has passed locally.
+ * PENDING cheques are NEVER auto-passed. They stay pending with their
+ * original due_date and surface as "Overdue" in the dashboard.
+ *
+ * Dates are NEVER rolled forward — a cheque's due_date is immutable.
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,14 +27,17 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   const today = new Date().toISOString().split('T')[0]
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split('T')[0]
 
   const { data: allSettings } = await supabase.from('settings').select('*')
 
   let totalPassed = 0
-  let totalRolled = 0
 
   for (const settings of allSettings ?? []) {
+    // Treat missing column as "disabled" — new default is off
+    const autoPassEnabled = settings.auto_pass_enabled === true
+
+    if (!autoPassEnabled) continue
+
     const autoPassTime = settings.auto_pass_time ?? '23:59:00'
     const [hours, minutes] = autoPassTime.split(':').map(Number)
     const now = new Date()
@@ -43,61 +46,44 @@ Deno.serve(async (req) => {
 
     if (now < passTime) continue
 
+    // Only auto-pass DEPOSITED cheques (not PENDING)
     const { data: cheques } = await supabase
       .from('cheques')
       .select('id, status')
       .eq('user_id', settings.user_id)
-      .in('status', ['PENDING', 'DEPOSITED'])
+      .eq('status', 'DEPOSITED')
       .lte('due_date', today)
       .eq('auto_transition_blocked', false)
       .is('deleted_at', null)
 
-    // Treat missing column as "enabled" so behavior is unchanged for users
-    // whose row predates the auto_pass_enabled migration.
-    const autoPassEnabled = settings.auto_pass_enabled !== false
-
     for (const cheque of cheques ?? []) {
-      if (autoPassEnabled) {
-        const { data: current } = await supabase
-          .from('cheques')
-          .select('status')
-          .eq('id', cheque.id)
-          .single()
+      const { data: current } = await supabase
+        .from('cheques')
+        .select('status')
+        .eq('id', cheque.id)
+        .single()
 
-        if (!current) continue
+      if (!current) continue
 
-        await supabase
-          .from('cheques')
-          .update({ status: 'PASSED', updated_at: new Date().toISOString() })
-          .eq('id', cheque.id)
+      await supabase
+        .from('cheques')
+        .update({ status: 'PASSED', updated_at: new Date().toISOString() })
+        .eq('id', cheque.id)
 
-        await supabase.from('cheque_history').insert({
-          cheque_id: cheque.id,
-          from_status: current.status,
-          to_status: 'PASSED',
-          changed_by: 'auto',
-          note: `Scheduled auto-pass on ${today}`,
-        })
+      await supabase.from('cheque_history').insert({
+        cheque_id: cheque.id,
+        from_status: current.status,
+        to_status: 'PASSED',
+        changed_by: 'auto',
+        note: `Scheduled auto-pass on ${today}`,
+      })
 
-        totalPassed++
-      } else {
-        // Roll the cheque forward by one day. We deliberately bump the
-        // due_date to "tomorrow" relative to NOW (not just +1 from the
-        // existing due_date) so a cheque whose due_date was, say, 5 days
-        // ago doesn't roll forward 5 times in one night — it just resurfaces
-        // on the next business day until the user processes it.
-        await supabase
-          .from('cheques')
-          .update({ due_date: tomorrow, updated_at: new Date().toISOString() })
-          .eq('id', cheque.id)
-
-        totalRolled++
-      }
+      totalPassed++
     }
   }
 
   return new Response(
-    JSON.stringify({ passed: totalPassed, rolled_forward: totalRolled }),
+    JSON.stringify({ passed: totalPassed }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 })

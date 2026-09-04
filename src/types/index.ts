@@ -66,9 +66,10 @@ export interface Settings {
   user_id: string
   auto_pass_time: string
   /**
-   * When true, cheques still PENDING/DEPOSITED at the auto-pass time on their
-   * due date are auto-marked PASSED. When false, the cheque stays in its
-   * current status and its due_date is rolled forward by one day.
+   * When true, DEPOSITED cheques past their due date are auto-marked PASSED
+   * at the auto_pass_time. PENDING cheques are never auto-passed.
+   * When false (default), no automatic transitions occur.
+   * Cheque dates never change regardless of this setting.
    */
   auto_pass_enabled: boolean
   currency_symbol: string
