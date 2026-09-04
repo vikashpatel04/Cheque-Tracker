@@ -158,17 +158,22 @@ export function PartyDetail() {
         ))}
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {(['ALL', 'PENDING', 'DEPOSITED', 'PASSED', 'RETURNED', 'CANCELLED'] as const).map((s) => (
-          <Button
-            key={s}
-            variant={statusFilter === s ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter(s)}
-          >
-            {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
-          </Button>
-        ))}
+      <div className="flex flex-col sm:flex-row justify-between gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {(['ALL', 'PENDING', 'DEPOSITED', 'PASSED', 'RETURNED', 'CANCELLED'] as const).map((s) => (
+            <Button
+              key={s}
+              variant={statusFilter === s ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'ALL' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+            </Button>
+          ))}
+        </div>
+        <Button variant="outline" onClick={() => navigate(`/parties/${party.id}/bulk-add`)}>
+          Bulk Add Cheques
+        </Button>
       </div>
 
       <Card>

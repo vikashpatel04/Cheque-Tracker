@@ -94,7 +94,10 @@ export function ChequeList() {
             <Download className="h-4 w-4 mr-1" /> Excel
           </Button>
           <Button variant="outline" onClick={() => setBulkOpen(true)}>
-            <Upload className="h-4 w-4 mr-1" /> Bulk Upload
+            <Upload className="h-4 w-4 mr-1" /> Excel Upload
+          </Button>
+          <Button variant="outline" onClick={() => window.location.href = '/bulk-add'}>
+            <Plus className="h-4 w-4 mr-1" /> Bulk Add
           </Button>
           <Button onClick={() => { setEditCheque(null); setFormOpen(true) }}>
             <Plus className="h-4 w-4 mr-1" /> Add Cheque

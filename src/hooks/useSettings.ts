@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS: Omit<Settings, 'id' | 'user_id' | 'created_at' | 'update
   auto_pass_enabled: false,
   currency_symbol: '₹',
   allocation_sort: 'due_date_asc',
+  banks: ['SBI', 'HDFC', 'ICICI', 'Bank of Baroda', 'Axis Bank', 'Kotak Mahindra', 'Punjab National Bank'],
 }
 
 export function useSettings() {
@@ -49,6 +50,7 @@ export function useSettings() {
     auto_pass_enabled?: boolean
     currency_symbol?: string
     allocation_sort?: AllocationSort
+    banks?: string[]
   }) => {
     if (!settings) return { error: 'No settings found' }
 
@@ -66,6 +68,7 @@ export function useSettings() {
     loading,
     currencySymbol: settings?.currency_symbol ?? '₹',
     allocationSort: settings?.allocation_sort ?? 'due_date_asc',
+    banks: settings?.banks ?? DEFAULT_SETTINGS.banks,
     updateSettings,
     fetchSettings,
   }

@@ -74,6 +74,10 @@ export interface Settings {
   auto_pass_enabled: boolean
   currency_symbol: string
   allocation_sort: AllocationSort
+  /**
+   * User-configured list of banks for dropdown selection.
+   */
+  banks: string[]
   created_at: string
   updated_at: string
 }

@@ -10,6 +10,7 @@ import PartiesPage from '@/pages/PartiesPage'
 import Returned from '@/pages/Returned'
 import Reports from '@/pages/Reports'
 import SettingsPage from '@/pages/Settings'
+import BulkAdd from '@/pages/BulkAdd'
 
 function AppRoutes() {
   useAutoTransition()
@@ -25,6 +26,8 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/cheques" element={<Cheques />} />
+                <Route path="/bulk-add" element={<BulkAdd />} />
+                <Route path="/parties/:partyId/bulk-add" element={<BulkAdd />} />
                 <Route path="/parties/*" element={<PartiesPage />} />
                 <Route path="/returned" element={<Returned />} />
                 <Route path="/reports" element={<Reports />} />

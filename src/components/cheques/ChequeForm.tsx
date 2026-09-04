@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
-import { DateRangePicker } from '@/components/ui/date-picker'
 import { STATUS_ACTION_META } from './StatusActions'
 import { useParties } from '@/hooks/useParties'
+import { useSettings } from '@/hooks/useSettings'
 import { updateChequeStatus } from '@/lib/updateChequeStatus'
 import { todayISO, formatAmountInput, parseAmount, nextChequeNumber } from '@/lib/formatters'
 import { supabase } from '@/lib/supabase'
@@ -40,6 +40,7 @@ interface ChequeFormProps {
 
 export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onStatusChange }: ChequeFormProps) {
   const { parties } = useParties()
+  const { banks } = useSettings()
   const [newStatus, setNewStatus] = useState<ChequeStatus | ''>('')
   const [returnReason, setReturnReason] = useState('')
   const [amountDisplay, setAmountDisplay] = useState('')
@@ -96,8 +97,6 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
   }, [open, cheque, prefill, reset, setValue])
 
   const partyId = watch('party_id')
-  const issueDate = watch('issue_date')
-  const dueDate = watch('due_date')
 
   const partyOptions = useMemo<ComboboxOption[]>(
     () => parties.map((p) => ({ value: p.id, label: p.name, hint: p.bank_name ?? undefined })),
@@ -146,7 +145,16 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
           </div>
           <div>
             <Label htmlFor="bank_name">Bank Name *</Label>
-            <Input id="bank_name" {...register('bank_name')} />
+            <Combobox
+              id="bank_name"
+              options={banks.map((b) => ({ value: b, label: b }))}
+              value={watch('bank_name')}
+              onChange={(v) => setValue('bank_name', v, { shouldValidate: true })}
+              placeholder="Select bank"
+              searchPlaceholder="Search bank..."
+              emptyText="No bank found. Add in settings."
+            />
+            {errors.bank_name && <p className="text-sm text-destructive">{errors.bank_name.message}</p>}
           </div>
           <div>
             <Label htmlFor="amount">Amount *</Label>
@@ -163,21 +171,25 @@ export function ChequeForm({ open, onOpenChange, cheque, prefill, onSubmit, onSt
             />
             {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
           </div>
-          <div>
-            <Label htmlFor="issue_date">Issue Date &ndash; Due Date</Label>
-            <DateRangePicker
-              id="issue_date"
-              from={issueDate}
-              to={dueDate}
-              onChange={({ from, to }) => {
-                setValue('issue_date', from, { shouldValidate: true })
-                setValue('due_date', to, { shouldValidate: true })
-              }}
-              placeholder="Pick issue &amp; due dates"
-            />
-            {(errors.issue_date || errors.due_date) && (
-              <p className="text-sm text-destructive">Select both issue and due dates</p>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="issue_date">Issue Date *</Label>
+              <Input
+                id="issue_date"
+                type="date"
+                {...register('issue_date')}
+              />
+              {errors.issue_date && <p className="text-sm text-destructive">{errors.issue_date.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="due_date">Due Date *</Label>
+              <Input
+                id="due_date"
+                type="date"
+                {...register('due_date')}
+              />
+              {errors.due_date && <p className="text-sm text-destructive">{errors.due_date.message}</p>}
+            </div>
           </div>
           <div>
             <Label htmlFor="notes">Notes</Label>

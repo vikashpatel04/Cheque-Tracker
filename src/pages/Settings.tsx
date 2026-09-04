@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,6 +29,8 @@ export default function SettingsPage() {
   const [autoPassTime, setAutoPassTime] = useState(settings?.auto_pass_time?.slice(0, 5) ?? '23:59')
   const [allocationSort, setAllocationSort] = useState<AllocationSort>(settings?.allocation_sort ?? 'due_date_asc')
   const [currency, setCurrency] = useState(settings?.currency_symbol ?? '₹')
+  const [banksList, setBanksList] = useState<string[]>(settings?.banks ?? [])
+  const [newBank, setNewBank] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -38,10 +41,24 @@ export default function SettingsPage() {
       auto_pass_time: `${autoPassTime}:00`,
       allocation_sort: allocationSort,
       currency_symbol: currency,
+      banks: banksList,
     })
     setSaving(false)
     if (result.error) toast.error(result.error)
     else toast.success('Settings saved')
+  }
+
+  const handleAddBank = () => {
+    const trimmed = newBank.trim()
+    if (!trimmed) return
+    if (!banksList.includes(trimmed)) {
+      setBanksList([...banksList, trimmed])
+    }
+    setNewBank('')
+  }
+
+  const handleRemoveBank = (bankToRemove: string) => {
+    setBanksList(banksList.filter((b) => b !== bankToRemove))
   }
 
   const handleExport = async () => {
@@ -121,6 +138,43 @@ export default function SettingsPage() {
             <Label htmlFor="currency">Currency Symbol</Label>
             <Input id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-20" />
           </div>
+
+          <div className="pt-2 border-t">
+            <Label>Bank List</Label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Configure the banks that appear in the dropdown when adding a cheque.
+            </p>
+            <div className="flex gap-2 mb-3">
+              <Input
+                placeholder="Add new bank..."
+                value={newBank}
+                onChange={(e) => setNewBank(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBank())}
+                className="max-w-xs"
+              />
+              <Button type="button" variant="secondary" onClick={handleAddBank}>
+                <Plus className="h-4 w-4 mr-1" /> Add
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 max-w-lg">
+              {banksList.map((b) => (
+                <div key={b} className="flex items-center gap-1.5 rounded-full border bg-muted/50 pl-3 pr-1 py-1 text-sm font-medium">
+                  {b}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBank(b)}
+                    className="p-1 rounded-full hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              {banksList.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">No banks configured</p>
+              )}
+            </div>
+          </div>
+
           <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>
