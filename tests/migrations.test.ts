@@ -59,6 +59,14 @@ describe('privileges', () => {
   })
 })
 
+describe('accounts created before the migrations', () => {
+  it('get a settings row too', async () => {
+    const early = await createTestDatabase({ usersBeforeMigrations: [U1] })
+    const { rows } = await early.asUser<{ country_code: string | null }>(U1, 'SELECT country_code FROM settings')
+    expect(rows).toEqual([{ country_code: null }])
+  })
+})
+
 describe('region settings', () => {
   it('starts new users without a region or India-specific defaults', async () => {
     await t.addUser(U1)

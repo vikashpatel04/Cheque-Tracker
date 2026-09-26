@@ -47,10 +47,16 @@ export interface TestDatabase {
   addUser(id: string): Promise<void>
 }
 
-export async function createTestDatabase(options: { exposeNewTables?: boolean } = {}): Promise<TestDatabase> {
+export async function createTestDatabase(
+  options: { exposeNewTables?: boolean; usersBeforeMigrations?: string[] } = {}
+): Promise<TestDatabase> {
   const db = new PGlite()
   await db.exec(SUPABASE_STANDINS)
   if (options.exposeNewTables) await db.exec(EXPOSE_NEW_TABLES)
+  // Accounts that exist before any migration runs, e.g. a login added in the dashboard of a new project.
+  for (const id of options.usersBeforeMigrations ?? []) {
+    await db.query('INSERT INTO auth.users (id, email) VALUES ($1, $2)', [id, `${id.slice(0, 8)}@example.com`])
+  }
 
   const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()
   for (const file of files) {

@@ -58,7 +58,7 @@ docs(regions): add New Zealand
 
 ### Database changes
 
-- Add a new, numbered file in `supabase/migrations/` (the next one is `014_…`).
+- Add a new, numbered file in `supabase/migrations/` (the next one is `015_…`).
 - Keep migrations additive and backward compatible: new nullable or defaulted columns, and new functions. Self-hosted databases upgrade by applying new files in order.
 - The companion projects read the same database, so say so in the pull request if a change could affect either one:
   - [Cheque Watch](https://github.com/vikashpatel04/cheque-watch#compatibility) reads specific columns of `cheques` and `parties`
