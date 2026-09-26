@@ -1,0 +1,74 @@
+name: Bug report
+description: Something in the web app doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please **remove real cheque, party and bank details and any keys** from screenshots and logs before posting.
+        Problems with the MCP server or the watch app go to [cheque-mcp](https://github.com/vikashpatel04/cheque-mcp/issues) or [Cheque Watch](https://github.com/vikashpatel04/cheque-watch/issues).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard
+        - Cheques (list, form, detail, status)
+        - Add funds / allocation
+        - Returned (re-present, write-off)
+        - Rollback / history
+        - Parties
+        - Bulk add / Excel upload
+        - Reports / exports
+        - Settings / auto-pass
+        - Login / install (PWA)
+        - Database / migrations
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, including any error message or toast.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. Android 14, Chrome 140 (installed as app) / Windows 11, Edge 140
+  - type: input
+    id: migration
+    attributes:
+      label: Latest migration applied
+      description: The highest-numbered file from supabase/migrations/ that's applied to your database.
+      placeholder: e.g. 009_represent_writeoff_rollback.sql
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
+      description: Browser console errors are especially helpful.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I've removed real cheque, party and bank data and any keys from this report.
+          required: true

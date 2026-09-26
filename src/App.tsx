@@ -1,0 +1,52 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
+import { Layout } from '@/components/shared/Layout'
+import { ProtectedRoute } from '@/components/shared/ProtectedRoute'
+import { useAutoTransition } from '@/hooks/useAutoTransition'
+import Login from '@/pages/Login'
+import Dashboard from '@/pages/Dashboard'
+import Cheques from '@/pages/Cheques'
+import PartiesPage from '@/pages/PartiesPage'
+import Returned from '@/pages/Returned'
+import Reports from '@/pages/Reports'
+import SettingsPage from '@/pages/Settings'
+import BulkAdd from '@/pages/BulkAdd'
+
+function AppRoutes() {
+  useAutoTransition()
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/cheques" element={<Cheques />} />
+                <Route path="/bulk-add" element={<BulkAdd />} />
+                <Route path="/parties/:partyId/bulk-add" element={<BulkAdd />} />
+                <Route path="/parties/*" element={<PartiesPage />} />
+                <Route path="/returned" element={<Returned />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+      <Toaster position="top-right" richColors />
+    </BrowserRouter>
+  )
+}

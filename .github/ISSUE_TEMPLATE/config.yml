@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/vikashpatel04/Cheque-Tracker/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: cheque-mcp (AI / MCP server) issues
+    url: https://github.com/vikashpatel04/cheque-mcp/issues
+    about: Problems or ideas for the MCP server.
+  - name: Cheque Watch (Wear OS) issues
+    url: https://github.com/vikashpatel04/cheque-watch/issues
+    about: Problems or ideas for the watch app, tile or watch-today function.

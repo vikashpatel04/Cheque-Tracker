@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest an improvement or a new feature for the web app
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation, e.g. "At month end I need to see…"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you handle it today?
+      description: Workarounds or other options you've considered.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This needs a database change (new columns, tables or functions).
+        - label: This would also affect cheque-mcp or Cheque Watch.
