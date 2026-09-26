@@ -3,6 +3,10 @@
  * applied, plus small stand-ins for what Supabase provides: the anon,
  * authenticated and service roles, auth.users and auth.uid(). Queries can
  * run as a signed-in user, with row-level security on.
+ *
+ * By default the database behaves like a Supabase project with "automatically
+ * expose new tables" turned off, so tests only pass if the migrations grant
+ * every privilege the app needs.
  */
 import fs from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
@@ -25,6 +29,10 @@ const SUPABASE_STANDINS = `
   CREATE TABLE cron.job (jobid bigint, jobname text);
   CREATE FUNCTION cron.alter_job(job_id bigint, schedule text) RETURNS void LANGUAGE sql AS $$ SELECT $$;
   GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+`
+
+/** Supabase's "automatically expose new tables" project setting. */
+const EXPOSE_NEW_TABLES = `
   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
 `
@@ -39,9 +47,10 @@ export interface TestDatabase {
   addUser(id: string): Promise<void>
 }
 
-export async function createTestDatabase(): Promise<TestDatabase> {
+export async function createTestDatabase(options: { exposeNewTables?: boolean } = {}): Promise<TestDatabase> {
   const db = new PGlite()
   await db.exec(SUPABASE_STANDINS)
+  if (options.exposeNewTables) await db.exec(EXPOSE_NEW_TABLES)
 
   const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()
   for (const file of files) {

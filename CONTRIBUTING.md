@@ -58,12 +58,13 @@ docs(regions): add New Zealand
 
 ### Database changes
 
-- Add a new, numbered file in `supabase/migrations/` (the next one is `013_…`).
+- Add a new, numbered file in `supabase/migrations/` (the next one is `014_…`).
 - Keep migrations additive and backward compatible: new nullable or defaulted columns, and new functions. Self-hosted databases upgrade by applying new files in order.
 - The companion projects read the same database, so say so in the pull request if a change could affect either one:
   - [Cheque Watch](https://github.com/vikashpatel04/cheque-watch#compatibility) reads specific columns of `cheques` and `parties`
   - [cheque-mcp](https://github.com/vikashpatel04/cheque-mcp) reads and writes `cheques`, `parties`, `cheque_history` and `daily_deposits`
 - Keep row-level security on for every table, and don't hardcode project URLs or keys in migrations.
+- Grant privileges explicitly for every new table or view. Projects may have Supabase's "automatically expose new tables" turned off, and the tests run that way (see `013_explicit_grants.sql`).
 - If you change security rules or SQL functions, add a case to `tests/migrations.test.ts`. It applies every migration to an in-memory Postgres and checks behaviour as signed-in users.
 
 ## Secrets and personal data

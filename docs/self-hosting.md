@@ -39,7 +39,7 @@ Apply the migrations in `supabase/migrations/` in order, from `001` to the lates
 - **CLI:** `npx supabase link --project-ref <your-project-ref>`, then `npx supabase db push`
 - **Dashboard:** paste each file into the SQL Editor and run it
 
-They create the tables, row-level security, SQL functions and the single `instance_config` row. Leave `instance_config.billing_enabled` set to `false`; that's what makes an instance self-hosted. See [editions.md](./editions.md).
+They create the tables, row-level security, SQL functions and the single `instance_config` row, and grant table privileges explicitly. You can therefore turn off **Automatically expose new tables** when you create the project, as Supabase recommends, and turn on **Enable automatic RLS**. Leave `instance_config.billing_enabled` set to `false`; that's what makes an instance self-hosted. See [editions.md](./editions.md).
 
 ## 4. Create your login
 

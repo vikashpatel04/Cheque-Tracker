@@ -23,6 +23,7 @@ For problems in the companion projects, report them in [cheque-mcp](https://gith
 This is useful for reviewers and for anyone running their own copy:
 
 - The web app only uses the Supabase **publishable (anon) key**, which is public by design. Access to data is controlled by **row-level security**, so each signed-in user can only read and change their own rows. The schema is public too, so RLS is the whole boundary.
+- Table privileges are granted explicitly (`013_explicit_grants.sql`) rather than left to Supabase's defaults. Visitors who aren't signed in can only read the instance config, and signed-in users can't delete rows; the app only soft-deletes.
 - Status changes, deposits, re-present, write-off and rollback run as SQL functions with `SECURITY INVOKER`, so row-level security still applies. For app users, `cheque_history` is append-only.
 - For received cheques, a trigger only lets those functions change a status, and only they can write history. The trigger also checks that the party and bank account belong to the user, since foreign keys skip row-level security.
 - The `all_cheques` view is created with `security_invoker`, so it shows only the user's own rows.

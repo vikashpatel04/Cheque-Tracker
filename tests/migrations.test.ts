@@ -14,8 +14,49 @@ let t: TestDatabase
 const writeAccess = async (uid: string) =>
   (await t.asUser<{ w: boolean }>(uid, 'SELECT has_write_access() AS w')).rows[0].w
 
+/** Every table privilege the Data API roles have on the app's tables, as "role PRIVILEGE table". */
+const PRIVILEGES_SQL = `
+  SELECT r.role || ' ' || p.privilege || ' ' || t.name AS grant
+  FROM (VALUES ('anon'), ('authenticated'), ('service_role')) AS r(role)
+  CROSS JOIN (VALUES ('parties'), ('cheques'), ('cheque_history'), ('daily_deposits'), ('settings'),
+    ('instance_config'), ('entitlements'), ('bank_accounts'), ('received_cheques'),
+    ('received_cheque_history'), ('all_cheques')) AS t(name)
+  CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(privilege)
+  WHERE has_table_privilege(r.role, 'public.' || t.name, p.privilege)
+  ORDER BY 1`
+
+const grantsIn = async (database: TestDatabase) =>
+  (await database.asAdmin<{ grant: string }>(PRIVILEGES_SQL)).rows.map((r) => r.grant)
+
 beforeAll(async () => {
   t = await createTestDatabase()
+})
+
+describe('privileges', () => {
+  it('give visitors only the instance config', async () => {
+    const anon = (await grantsIn(t)).filter((g) => g.startsWith('anon '))
+    expect(anon).toEqual(['anon SELECT instance_config'])
+  })
+
+  it('never let signed-in users delete or truncate', async () => {
+    const risky = (await grantsIn(t)).filter((g) => /^authenticated (DELETE|TRUNCATE) /.test(g))
+    expect(risky).toEqual([])
+  })
+
+  it('let signed-in users change their data but only read plans and settings of the instance', async () => {
+    const grants = await grantsIn(t)
+    expect(grants).toContain('authenticated INSERT cheques')
+    expect(grants).toContain('authenticated UPDATE received_cheques')
+    expect(grants).not.toContain('authenticated INSERT entitlements')
+    expect(grants).not.toContain('authenticated UPDATE instance_config')
+    expect(grants).not.toContain('authenticated UPDATE cheque_history')
+    expect(grants).toContain('service_role DELETE cheques')
+  })
+
+  it('end up the same whether or not the project exposes new tables automatically', async () => {
+    const exposed = await createTestDatabase({ exposeNewTables: true })
+    expect(await grantsIn(exposed)).toEqual(await grantsIn(t))
+  })
 })
 
 describe('region settings', () => {
