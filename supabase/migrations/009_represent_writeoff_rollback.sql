@@ -1,6 +1,6 @@
 -- Re-present, write-off and rollback.
 --
--- The shop is the cheque GIVER. A RETURNED cheque is one of ours that bounced.
+-- The user is the cheque GIVER. A RETURNED cheque is one of theirs that bounced.
 --   - Re-present: the party deposits the SAME cheque again. The cheque goes
 --     back to PENDING (optionally straight to DEPOSITED) with a new expected
 --     date, and then follows the normal life cycle. The printed date is kept

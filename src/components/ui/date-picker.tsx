@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { DATE_DISPLAY_FORMAT, formatDate, toISODate } from '@/lib/formatters'
+import { formatDate, toISODate } from '@/lib/formatters'
+import { getActiveRegion } from '@/lib/region'
 
 function toDate(iso?: string | null): Date | undefined {
   if (!iso) return undefined
@@ -24,7 +25,7 @@ interface DatePickerProps {
   disabled?: boolean
 }
 
-/** Single-date picker. Works with ISO (yyyy-MM-dd) strings, displays DD/MM/YYYY. */
+/** Single-date picker. Works with ISO (yyyy-MM-dd) strings, displays the user's date format. */
 export function DatePicker({
   value,
   onChange,
@@ -59,6 +60,7 @@ export function DatePicker({
           mode="single"
           selected={selected}
           defaultMonth={selected}
+          weekStartsOn={getActiveRegion().weekStartsOn}
           onSelect={(d) => {
             if (d) onChange(toISODate(d))
             setOpen(false)
@@ -84,7 +86,7 @@ interface DateRangePickerProps {
 
 /**
  * From–to date range picker. Works with ISO (yyyy-MM-dd) strings, displays
- * DD/MM/YYYY – DD/MM/YYYY.
+ * both dates in the user's date format.
  */
 export function DateRangePicker({
   from,
@@ -131,6 +133,7 @@ export function DateRangePicker({
           selected={range}
           defaultMonth={range?.from}
           numberOfMonths={numberOfMonths}
+          weekStartsOn={getActiveRegion().weekStartsOn}
           onSelect={(r) => {
             onChange({
               from: r?.from ? toISODate(r.from) : '',
@@ -145,18 +148,34 @@ export function DateRangePicker({
   )
 }
 
-/** Insert slashes as the user types digits: "2309" -> "23/09", "23092026" -> "23/09/2026". */
-function maskDate(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 8)
-  if (digits.length <= 2) return digits
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+/** Segment lengths and separator of a date format: dd/MM/yyyy -> [2, 2, 4] and "/". */
+function formatShape(pattern: string) {
+  const separator = pattern.match(/[^dMy]/)?.[0] ?? '/'
+  const lengths = pattern.split(separator).map((s) => s.length)
+  return { separator, lengths, digits: lengths.reduce((a, b) => a + b, 0) }
 }
 
-/** Parse a complete DD/MM/YYYY string, rejecting impossible dates like 31/02/2026. */
-function parseDisplayDate(text: string): Date | null {
-  if (text.length !== 10) return null
-  const d = parse(text, DATE_DISPLAY_FORMAT, new Date())
+/**
+ * Insert separators as the user types digits, following the date format:
+ * with dd/MM/yyyy, "2309" -> "23/09" and "23092026" -> "23/09/2026".
+ */
+function maskDate(raw: string, pattern: string): string {
+  const { separator, lengths, digits: maxDigits } = formatShape(pattern)
+  const digits = raw.replace(/\D/g, '').slice(0, maxDigits)
+  const pieces: string[] = []
+  let start = 0
+  for (const len of lengths) {
+    if (start >= digits.length) break
+    pieces.push(digits.slice(start, start + len))
+    start += len
+  }
+  return pieces.join(separator)
+}
+
+/** Parse a complete date in the given format, rejecting impossible dates like 31/02/2026. */
+function parseDisplayDate(text: string, pattern: string): Date | null {
+  if (text.length !== pattern.length) return null
+  const d = parse(text, pattern, new Date())
   return isValid(d) && d.getFullYear() >= 1900 ? d : null
 }
 
@@ -170,12 +189,14 @@ interface DateInputProps {
 }
 
 /**
- * Typeable date field that always shows DD/MM/YYYY regardless of the
- * browser/OS locale (unlike <input type="date">). Slashes are inserted
- * automatically; a calendar button offers point-and-click selection.
- * Works with ISO (yyyy-MM-dd) strings like the other pickers.
+ * Typeable date field that always shows the user's date format (from their
+ * region settings) regardless of the browser/OS locale, unlike
+ * <input type="date">. Separators are inserted automatically; a calendar
+ * button offers point-and-click selection. Works with ISO (yyyy-MM-dd)
+ * strings like the other pickers.
  */
 export function DateInput({ value, onChange, id, className, disabled, ...rest }: DateInputProps) {
+  const { dateFormat, weekStartsOn } = getActiveRegion()
   const [text, setText] = useState(() => (toDate(value) ? formatDate(toDate(value)!) : ''))
   const [open, setOpen] = useState(false)
   const selected = toDate(value)
@@ -187,15 +208,15 @@ export function DateInput({ value, onChange, id, className, disabled, ...rest }:
   }, [value])
 
   const handleChange = (raw: string) => {
-    const masked = maskDate(raw)
+    const masked = maskDate(raw, dateFormat)
     setText(masked)
-    const d = parseDisplayDate(masked)
+    const d = parseDisplayDate(masked, dateFormat)
     if (d) onChange(toISODate(d))
   }
 
   // Leaving the field with an incomplete/invalid date restores the last valid one.
   const handleBlur = () => {
-    if (!parseDisplayDate(text)) setText(selected ? formatDate(selected) : '')
+    if (!parseDisplayDate(text, dateFormat)) setText(selected ? formatDate(selected) : '')
   }
 
   return (
@@ -205,8 +226,8 @@ export function DateInput({ value, onChange, id, className, disabled, ...rest }:
         type="text"
         inputMode="numeric"
         autoComplete="off"
-        placeholder="DD/MM/YYYY"
-        maxLength={10}
+        placeholder={dateFormat.toUpperCase()}
+        maxLength={dateFormat.length}
         value={text}
         disabled={disabled}
         aria-invalid={rest['aria-invalid']}
@@ -232,7 +253,7 @@ export function DateInput({ value, onChange, id, className, disabled, ...rest }:
             mode="single"
             selected={selected}
             defaultMonth={selected}
-            weekStartsOn={1}
+            weekStartsOn={weekStartsOn}
             onSelect={(d) => {
               if (d) onChange(toISODate(d))
               setOpen(false)

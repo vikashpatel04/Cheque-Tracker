@@ -14,8 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/formatters'
-import { useSettings } from '@/hooks/useSettings'
+import { formatCurrency, formatDate, formatDateTime, localizeIsoDates } from '@/lib/formatters'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { DaysUntilDue } from '@/components/shared/DaysUntilDue'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -30,7 +29,7 @@ import { toast } from 'sonner'
 const CHANGED_BY_LABELS: Record<string, string> = {
   manual: 'You',
   auto: 'Auto-pass',
-  deposit_allocation: 'Deposit allocation',
+  deposit_allocation: 'Add funds',
   rollback: 'Rolled back',
   velo: 'Assistant',
 }
@@ -45,7 +44,6 @@ interface ChequeDetailProps {
 
 export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }: ChequeDetailProps) {
   const navigate = useNavigate()
-  const { currencySymbol } = useSettings()
   const [cheque, setCheque] = useState<Cheque | null>(null)
   const [history, setHistory] = useState<ChequeHistory[]>([])
   // Replacement links: the cheque this one replaces, or the ones issued in its place.
@@ -160,7 +158,7 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
               <div className="grid gap-2">
                 <p><span className="text-muted-foreground">Party:</span> {cheque.party?.name}</p>
                 <p><span className="text-muted-foreground">Bank:</span> {cheque.bank_name}</p>
-                <p><span className="text-muted-foreground">Amount:</span> {formatCurrency(Number(cheque.amount), currencySymbol)}</p>
+                <p><span className="text-muted-foreground">Amount:</span> {formatCurrency(Number(cheque.amount))}</p>
                 <p><span className="text-muted-foreground">Issue Date:</span> {formatDate(cheque.issue_date)}</p>
                 {cheque.original_due_date && cheque.original_due_date !== cheque.due_date ? (
                   <>
@@ -233,7 +231,7 @@ export function ChequeDetail({ chequeId, open, onOpenChange, onEdit, onRefresh }
                       <p className="text-xs text-muted-foreground">
                         {CHANGED_BY_LABELS[h.changed_by] ?? h.changed_by} · {formatDateTime(h.created_at)}
                       </p>
-                      {h.note && <p className="text-xs">{h.note}</p>}
+                      {h.note && <p className="text-xs">{localizeIsoDates(h.note)}</p>}
                     </div>
                   ))}
                 </div>

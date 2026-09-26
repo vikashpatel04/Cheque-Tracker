@@ -16,7 +16,6 @@ interface DayChequesDialogProps {
   cheques: Cheque[]
   /** Date currently shown — `null` keeps the dialog closed. */
   date: Date | null
-  currencySymbol?: string
   onChangeDate: (date: Date) => void
   onClose: () => void
   onSelectCheque?: (chequeId: string) => void
@@ -29,7 +28,6 @@ interface DayChequesDialogProps {
 export function DayChequesDialog({
   cheques,
   date,
-  currencySymbol = '₹',
   onChangeDate,
   onClose,
   onSelectCheque,
@@ -62,7 +60,7 @@ export function DayChequesDialog({
               <p className="text-xs text-muted-foreground mt-0.5 truncate">
                 {date ? format(date, 'EEEE') : ''} · {dayCheques.length} cheque
                 {dayCheques.length !== 1 ? 's' : ''}
-                {total > 0 && ` · ${formatCurrency(total, currencySymbol)}`}
+                {total > 0 && ` · ${formatCurrency(total)}`}
               </p>
             </div>
 
@@ -112,7 +110,7 @@ export function DayChequesDialog({
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-semibold">
-                    {formatCurrency(Number(c.amount), currencySymbol)}
+                    {formatCurrency(Number(c.amount))}
                   </p>
                   <StatusPill status={c.status} />
                 </div>

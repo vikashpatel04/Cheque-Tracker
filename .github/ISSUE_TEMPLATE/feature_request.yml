@@ -26,4 +26,5 @@ body:
       label: Scope
       options:
         - label: This needs a database change (new columns, tables or functions).
+        - label: This depends on the country (currency, date formats, cheque rules).
         - label: This would also affect cheque-mcp or Cheque Watch.

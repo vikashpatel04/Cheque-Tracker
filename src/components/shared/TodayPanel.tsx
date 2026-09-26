@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { format, startOfDay } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import {
   AlertTriangle,
   ArrowRight,
@@ -10,14 +10,13 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusPill } from '@/components/shared/StatusPill'
-import { formatCurrency, formatDate } from '@/lib/formatters'
+import { formatCurrency, formatDate, todayISO } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { getChequeTags, getOverdueTag, OVERDUE_TAG_LABELS, OVERDUE_TAG_CLASSES } from '@/lib/chequeTags'
 import type { Cheque } from '@/types'
 
 interface TodayPanelProps {
   cheques: Cheque[]
-  currencySymbol?: string
   onSelectCheque?: (chequeId: string) => void
 }
 
@@ -31,25 +30,24 @@ interface TodayPanelProps {
  * - Combined cheque list:
  *   1. "Today's Cheques" — due today, status PENDING or DEPOSITED
  *   2. "Overdue Cheques" — due before today, status PENDING or DEPOSITED
- *     each with an "Overdue" or "Overdue · Deposited" tag and original due date
+ *     each with an "Overdue" or "Overdue · Funded" tag and original due date
  *
  * PASSED cheques are completely done — never shown here.
  */
 export function TodayPanel({
   cheques,
-  currencySymbol = '₹',
   onSelectCheque,
 }: TodayPanelProps) {
-  const today = startOfDay(new Date())
-  const todayStr = format(today, 'yyyy-MM-dd')
+  const todayStr = todayISO()
+  const today = parseISO(todayStr)
   const dayName = format(today, 'EEEE')
 
-  // Today's cheques — due today and still pending or deposited
+  // Today's cheques — due today and still pending or funded
   const todayCheques = cheques.filter(
     (c) => c.due_date === todayStr && ['PENDING', 'DEPOSITED'].includes(c.status)
   )
 
-  // Overdue cheques — due before today and still pending or deposited
+  // Overdue cheques — due before today and still pending or funded
   const overdue = cheques.filter(
     (c) => c.due_date < todayStr && ['PENDING', 'DEPOSITED'].includes(c.status)
   )
@@ -106,7 +104,7 @@ export function TodayPanel({
         <div className="mt-5">
           <StatBlock
             label="Cash needed today"
-            value={formatCurrency(totalCashNeeded, currencySymbol)}
+            value={formatCurrency(totalCashNeeded)}
             sub={
               overdue.length > 0
                 ? `${todayCheques.length} today · ${overdue.length} overdue · ${totalCount} total`
@@ -128,7 +126,6 @@ export function TodayPanel({
                 <ChequeRow
                   key={c.id}
                   cheque={c}
-                  currencySymbol={currencySymbol}
                   onSelect={onSelectCheque}
                 />
               ))}
@@ -141,14 +138,13 @@ export function TodayPanel({
           <div className="mt-5">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-orange-600" />
-              Overdue Cheques · {formatCurrency(overdueAmount, currencySymbol)}
+              Overdue Cheques · {formatCurrency(overdueAmount)}
             </p>
             <div className="space-y-2">
               {overdue.map((c) => (
                 <ChequeRow
                   key={c.id}
                   cheque={c}
-                  currencySymbol={currencySymbol}
                   onSelect={onSelectCheque}
                   showOverdueTag
                 />
@@ -172,12 +168,11 @@ export function TodayPanel({
 
 interface ChequeRowProps {
   cheque: Cheque
-  currencySymbol: string
   onSelect?: (chequeId: string) => void
   showOverdueTag?: boolean
 }
 
-function ChequeRow({ cheque, currencySymbol, onSelect, showOverdueTag }: ChequeRowProps) {
+function ChequeRow({ cheque, onSelect, showOverdueTag }: ChequeRowProps) {
   const overdueTag = showOverdueTag ? getOverdueTag(cheque) : null
   const tags = getChequeTags(cheque)
 
@@ -213,7 +208,7 @@ function ChequeRow({ cheque, currencySymbol, onSelect, showOverdueTag }: ChequeR
       <div className="flex items-center gap-2 shrink-0">
         <div className="text-right">
           <p className="font-semibold">
-            {formatCurrency(Number(cheque.amount), currencySymbol)}
+            {formatCurrency(Number(cheque.amount))}
           </p>
           {overdueTag ? (
             <span

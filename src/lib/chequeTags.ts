@@ -1,4 +1,4 @@
-import { format, startOfDay } from 'date-fns'
+import { todayISO } from './formatters'
 import type { Cheque } from '@/types'
 
 export type ChequeTag = 'RE_PRESENTED' | 'FROM_RETURN' | 'WRITTEN_OFF'
@@ -29,7 +29,7 @@ export function stripTagLines(notes: string | null): string {
  * Returns null if the cheque is not overdue.
  */
 export function getOverdueTag(cheque: Cheque): OverdueTag | null {
-  const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd')
+  const todayStr = todayISO()
   if (cheque.due_date >= todayStr) return null
   if (cheque.status === 'PENDING') return 'OVERDUE'
   if (cheque.status === 'DEPOSITED') return 'OVERDUE_DEPOSITED'
@@ -78,7 +78,7 @@ export const TAG_LABELS: Record<ChequeTag, string> = {
 
 export const OVERDUE_TAG_LABELS: Record<OverdueTag, string> = {
   OVERDUE: 'Overdue',
-  OVERDUE_DEPOSITED: 'Overdue · Deposited',
+  OVERDUE_DEPOSITED: 'Overdue · Funded',
 }
 
 export const TAG_CLASSES: Record<ChequeTag, string> = {
@@ -106,7 +106,7 @@ export function countsAsIssued(cheque: Cheque): boolean {
   return !isLegacyRepresented(cheque)
 }
 
-/** Amount we still have to pay: scheduled (pending/deposited) or bounced and not yet resolved. */
+/** Amount we still have to pay: scheduled (pending/funded) or bounced and not yet resolved. */
 export function isStillToPay(cheque: Cheque): boolean {
   if (!countsAsIssued(cheque)) return false
   return ['PENDING', 'DEPOSITED', 'RETURNED'].includes(cheque.status)

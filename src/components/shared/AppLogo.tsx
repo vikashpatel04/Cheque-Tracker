@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { brand } from '@/config/brand'
 
 const sizeClasses = {
   sm: 'h-8 w-8',
@@ -17,16 +18,11 @@ export function AppLogo({ size = 'md', showText = true, className }: AppLogoProp
     <div className={cn('flex items-center gap-3', className)}>
       <img
         src="/cheque.png"
-        alt={showText ? '' : 'Cheque Tracker'}
+        alt={showText ? '' : brand.name}
         aria-hidden={showText}
         className={cn(sizeClasses[size], 'object-contain shrink-0')}
       />
-      {showText && (
-        <div>
-          <p className="text-lg font-bold tracking-tight leading-tight">Cheque Tracker</p>
-          <p className="text-xs text-muted-foreground">Retail Shop Manager</p>
-        </div>
-      )}
+      {showText && <p className="text-lg font-bold tracking-tight leading-tight">{brand.name}</p>}
     </div>
   )
 }

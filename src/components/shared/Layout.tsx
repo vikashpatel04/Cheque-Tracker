@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { DepositWidget } from '@/components/deposit/DepositWidget'
 import { AppLogo } from '@/components/shared/AppLogo'
+import { PlanBanner } from '@/components/shared/PlanBanner'
+import { SourceLink } from '@/components/shared/SourceLink'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -100,6 +102,7 @@ function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             <LogOut className="h-4 w-4" />
             Sign Out
           </Button>
+          <SourceLink className="block px-3 pt-2" />
         </div>
       </aside>
     </>
@@ -126,6 +129,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex-1 min-w-0" />
           <DepositWidget />
         </header>
+        <PlanBanner />
         {/* min-w-0 + overflow-x-hidden so tables/charts with `overflow-x-auto`
             wrappers scroll internally instead of forcing the page to scroll. */}
         <main className="p-4 md:p-6 min-w-0 overflow-x-hidden">{children}</main>

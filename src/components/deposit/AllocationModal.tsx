@@ -18,7 +18,7 @@ interface AllocationModalProps {
 }
 
 export function AllocationModal({ depositAmount, onClose, onConfirm }: AllocationModalProps) {
-  const { currencySymbol, allocationSort } = useSettings()
+  const { allocationSort } = useSettings()
   const [items, setItems] = useState<AllocationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -58,7 +58,7 @@ export function AllocationModal({ depositAmount, onClose, onConfirm }: Allocatio
       return
     }
     toast.success(
-      `${formatCurrency(depositAmount, currencySymbol)} added — ${selectedIds.length} cheque${selectedIds.length !== 1 ? 's' : ''} marked as Deposited`
+      `${formatCurrency(depositAmount)} added — ${selectedIds.length} cheque${selectedIds.length !== 1 ? 's' : ''} marked as Funded`
     )
     setSubmitting(false)
     onClose()
@@ -69,7 +69,7 @@ export function AllocationModal({ depositAmount, onClose, onConfirm }: Allocatio
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {formatCurrency(depositAmount, currencySymbol)} added — which pending cheques does it cover?
+            {formatCurrency(depositAmount)} added — which pending cheques does it cover?
           </DialogTitle>
         </DialogHeader>
 
@@ -96,7 +96,7 @@ export function AllocationModal({ depositAmount, onClose, onConfirm }: Allocatio
                   </TableCell>
                   <TableCell className="p-2">{item.cheque.party.name}</TableCell>
                   <TableCell className="p-2">{item.cheque.cheque_number}</TableCell>
-                  <TableCell className="p-2 text-right">{formatCurrency(Number(item.cheque.amount), currencySymbol)}</TableCell>
+                  <TableCell className="p-2 text-right">{formatCurrency(Number(item.cheque.amount))}</TableCell>
                   <TableCell className="p-2">{formatDate(item.cheque.due_date)}</TableCell>
                 </TableRow>
               ))}
@@ -106,12 +106,12 @@ export function AllocationModal({ depositAmount, onClose, onConfirm }: Allocatio
 
         <div className="space-y-1 text-sm">
           <p>
-            Allocated: {formatCurrency(allocated, currencySymbol)} / Remaining:{' '}
-            {formatCurrency(remaining, currencySymbol)}
+            Allocated: {formatCurrency(allocated)} / Remaining:{' '}
+            {formatCurrency(remaining)}
           </p>
           {exceeds > 0 && (
             <p className="text-destructive font-medium">
-              Selection exceeds deposit by {formatCurrency(exceeds, currencySymbol)}
+              Selection exceeds deposit by {formatCurrency(exceeds)}
             </p>
           )}
         </div>

@@ -1,30 +1,29 @@
 import { useMemo } from 'react'
-import { addDays, format, isSameDay, startOfDay } from 'date-fns'
+import { addDays, format, isSameDay, parseISO } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { formatCurrency } from '@/lib/formatters'
+import { formatCurrency, todayISO } from '@/lib/formatters'
 import { STATUS_COLORS } from '@/lib/chartUtils'
 import { cn } from '@/lib/utils'
 import type { Cheque } from '@/types'
 
 interface Next7DaysStripProps {
   cheques: Cheque[]
-  currencySymbol?: string
   onDayClick: (date: Date) => void
 }
 
 /**
  * Compact horizontal strip showing the next 7 days (today + 6).
  * Each card surfaces the day's cheque count, total amount, and a
- * tiny pending/deposited split bar. Click → opens the day modal.
+ * tiny pending/funded split bar. Click → opens the day modal.
  */
 export function Next7DaysStrip({
   cheques,
-  currencySymbol = '₹',
   onDayClick,
 }: Next7DaysStripProps) {
-  const today = startOfDay(new Date())
+  const todayStr = todayISO()
 
   const days = useMemo(() => {
+    const today = parseISO(todayStr)
     return Array.from({ length: 7 }, (_, i) => {
       const date = addDays(today, i)
       const dateStr = format(date, 'yyyy-MM-dd')
@@ -49,7 +48,7 @@ export function Next7DaysStrip({
         isToday: isSameDay(date, today),
       }
     })
-  }, [cheques, today])
+  }, [cheques, todayStr])
 
   const maxTotal = Math.max(1, ...days.map((d) => d.total))
 
@@ -104,10 +103,10 @@ export function Next7DaysStrip({
                 </div>
 
                 <p className="text-sm font-semibold mt-1 tabular-nums truncate">
-                  {d.total > 0 ? formatCurrency(d.total, currencySymbol) : '—'}
+                  {d.total > 0 ? formatCurrency(d.total) : '—'}
                 </p>
 
-                {/* Mini split bar: pending vs deposited */}
+                {/* Mini split bar: pending vs funded */}
                 {d.total > 0 && (
                   <div className="mt-2 space-y-1">
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">

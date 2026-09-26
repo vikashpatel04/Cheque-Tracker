@@ -1,59 +1,48 @@
 import { supabase } from './supabase'
 import { updateChequeStatus } from './updateChequeStatus'
-import { formatDate, todayISO } from './formatters'
+import { nowInUserTimeZone, todayISO } from './formatters'
+import type { Settings } from '@/types'
 
 /**
- * Client-side auto-transition — runs once on page load.
+ * Client-side auto-transition — runs once per visit, after the user's
+ * settings (and so their time zone) have loaded. The auto-pass Edge Function
+ * does the same on a schedule; this covers instances that don't deploy it.
  *
  * When auto_pass_enabled = true:
- *   Only auto-passes DEPOSITED cheques whose due_date <= today.
+ *   Once the user's local time is past auto_pass_time, DEPOSITED (funded)
+ *   cheques whose due_date is on or before today are marked PASSED.
  *   PENDING cheques are NOT auto-passed — they stay pending with an
  *   "Overdue" tag in the dashboard.
  *
  * When auto_pass_enabled = false (default):
  *   Does nothing. No date rolling, no status changes.
  */
-export async function runAutoTransition(): Promise<number> {
+export async function runAutoTransition(
+  settings: Pick<Settings, 'auto_pass_enabled' | 'auto_pass_time'>
+): Promise<number> {
+  if (!settings.auto_pass_enabled) return 0
+
+  const [hours, minutes] = (settings.auto_pass_time ?? '23:59:00').split(':').map(Number)
+  const now = nowInUserTimeZone()
+  if (now.getHours() * 60 + now.getMinutes() < hours * 60 + minutes) return 0
+
   const today = todayISO()
-
-  const { data: settings } = await supabase
-    .from('settings')
-    .select('auto_pass_time, auto_pass_enabled')
-    .single()
-
-  // Default off — do nothing unless explicitly enabled
-  if (settings?.auto_pass_enabled === false || !settings?.auto_pass_enabled) {
-    return 0
-  }
-
-  const autoPassTime = settings?.auto_pass_time ?? '23:59:00'
-  const [hours, minutes] = autoPassTime.split(':').map(Number)
-  const now = new Date()
-  const passTime = new Date()
-  passTime.setHours(hours, minutes, 0, 0)
-
-  if (now < passTime) {
-    return 0
-  }
-
-  // Only auto-pass DEPOSITED cheques (not PENDING)
   const { data: cheques, error } = await supabase
     .from('cheques')
-    .select('id, status, due_date')
+    .select('id')
     .eq('status', 'DEPOSITED')
     .lte('due_date', today)
     .eq('auto_transition_blocked', false)
     .is('deleted_at', null)
 
-  if (error || !cheques?.length) {
-    return 0
-  }
+  if (error || !cheques?.length) return 0
 
   let transitioned = 0
   for (const cheque of cheques) {
     const result = await updateChequeStatus(cheque.id, 'PASSED', {
       changedBy: 'auto',
-      note: `Auto-passed on ${formatDate(today)}`,
+      // ISO date so the note reads correctly in every date format.
+      note: `Auto-passed on ${today}`,
     })
     if (result.success) transitioned++
   }

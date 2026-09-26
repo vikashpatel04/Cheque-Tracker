@@ -1,28 +1,243 @@
 import { format, parse, parseISO, isValid } from 'date-fns'
+import { getActiveRegion, type Region } from './region'
 
-export const DATE_DISPLAY_FORMAT = 'dd/MM/yyyy'
-export const DATE_INPUT_FORMAT = 'yyyy-MM-dd'
+/**
+ * Money and date formatting. Everything follows the signed-in user's region
+ * (currency, number format, date format, time zone), so no country is
+ * assumed here. Pass a region explicitly only to preview another one.
+ */
 
-export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? parseISO(date) : date
-  return format(d, DATE_DISPLAY_FORMAT)
+/** Dates are stored and passed around as ISO calendar dates (yyyy-MM-dd). */
+export const ISO_DATE_FORMAT = 'yyyy-MM-dd'
+
+// Intl formatters are slow to build, so they're cached by their options.
+const numberFormats = new Map<string, Intl.NumberFormat>()
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>()
+
+function numberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = `${locale}|${JSON.stringify(options)}`
+  let f = numberFormats.get(key)
+  if (!f) {
+    f = new Intl.NumberFormat(locale, options)
+    numberFormats.set(key, f)
+  }
+  return f
 }
 
-export function formatDateTime(date: string | Date): string {
-  const d = typeof date === 'string' ? parseISO(date) : date
-  return format(d, 'dd/MM/yyyy h:mm a')
+function dateTimeFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`
+  let f = dateTimeFormats.get(key)
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, options)
+    dateTimeFormats.set(key, f)
+  }
+  return f
+}
+
+/* ---------- Money ---------- */
+
+export function formatCurrency(value: number, region: Region = getActiveRegion()): string {
+  return numberFormat(region.locale, { style: 'currency', currency: region.currency }).format(value)
+}
+
+/** Short form for chart axes and tiles, e.g. ₹1.2L or $1.2M. */
+export function formatCurrencyCompact(value: number, region: Region = getActiveRegion()): string {
+  return numberFormat(region.locale, {
+    style: 'currency',
+    currency: region.currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+/**
+ * The amount with the currency code instead of its symbol ("INR 1,25,000.00").
+ * For PDFs: the built-in PDF fonts can't draw symbols such as ₹.
+ */
+export function formatCurrencyCode(value: number, region: Region = getActiveRegion()): string {
+  return numberFormat(region.locale, {
+    style: 'currency',
+    currency: region.currency,
+    currencyDisplay: 'code',
+  }).format(value)
+}
+
+export function formatNumber(value: number, decimals = 0, region: Region = getActiveRegion()): string {
+  return numberFormat(region.locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value)
+}
+
+/** Grouping and decimal marks of a locale, e.g. "," and "." for en-IN. */
+function separators(locale: string) {
+  const parts = numberFormat(locale, {}).formatToParts(1234567.8)
+  return {
+    group: parts.find((p) => p.type === 'group')?.value ?? ',',
+    decimal: parts.find((p) => p.type === 'decimal')?.value ?? '.',
+  }
+}
+
+/** Minor units of the currency: 2 for INR or USD, 0 for JPY. */
+function currencyDecimals(region: Region): number {
+  return (
+    numberFormat(region.locale, { style: 'currency', currency: region.currency }).resolvedOptions()
+      .maximumFractionDigits ?? 2
+  )
+}
+
+/** Whether a character typed into an amount field is meant as the decimal mark. */
+function isDecimalMark(ch: string, group: string, decimal: string): boolean {
+  return ch === decimal || (ch === '.' && group !== '.')
+}
+
+/**
+ * Format a raw amount string for live display in an input, grouped the way the
+ * user writes numbers (1,00,000 in India, 100,000 in most places). Keeps a
+ * trailing decimal mark while the user is still typing the decimal part and
+ * caps decimals at the currency's minor units.
+ */
+export function formatAmountInput(raw: string, region: Region = getActiveRegion()): string {
+  const { group, decimal } = separators(region.locale)
+  const decimals = currencyDecimals(region)
+  let intDigits = ''
+  let fraction = ''
+  let hasDecimal = false
+  for (const ch of raw) {
+    if (ch >= '0' && ch <= '9') {
+      if (hasDecimal) fraction += ch
+      else intDigits += ch
+    } else if (!hasDecimal && isDecimalMark(ch, group, decimal)) {
+      hasDecimal = true
+    }
+  }
+  intDigits = intDigits.replace(/^0+(?=\d)/, '')
+  const grouped = intDigits
+    ? numberFormat(region.locale, { maximumFractionDigits: 0 }).format(BigInt(intDigits))
+    : ''
+  // Currencies without minor units (JPY) drop anything after the decimal
+  // mark rather than running it into the whole number.
+  if (!hasDecimal || decimals === 0) return grouped
+  return `${grouped}${decimal}${fraction.slice(0, decimals)}`
+}
+
+/** Parse an amount typed or shown in the user's number format. Returns 0 when there's none. */
+export function parseAmount(value: string, region: Region = getActiveRegion()): number {
+  const { group, decimal } = separators(region.locale)
+  let normalized = ''
+  let hasDecimal = false
+  for (const ch of value) {
+    if (ch >= '0' && ch <= '9') normalized += ch
+    else if (!hasDecimal && isDecimalMark(ch, group, decimal)) {
+      normalized += '.'
+      hasDecimal = true
+    }
+  }
+  const num = parseFloat(normalized)
+  return isNaN(num) ? 0 : num
+}
+
+/* ---------- Dates ---------- */
+
+/** The wall-clock time of an instant in the user's time zone, as a local Date. */
+function inTimeZone(instant: Date, timeZone: string): Date {
+  const parts = dateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instant)
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value)
+  return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+}
+
+/**
+ * Plain yyyy-MM-dd strings are calendar dates and have no time zone. Longer
+ * strings are timestamps, shown as the date they fall on in the user's time
+ * zone. Date objects are taken as local calendar dates.
+ */
+function toCalendarDate(date: string | Date, region: Region): Date {
+  if (date instanceof Date) return date
+  return date.length > 10 ? inTimeZone(new Date(date), region.timeZone) : parseISO(date)
+}
+
+export function formatDate(date: string | Date, region: Region = getActiveRegion()): string {
+  return format(toCalendarDate(date, region), region.dateFormat)
+}
+
+/** A timestamp as date and time in the user's time zone. */
+export function formatDateTime(date: string | Date, region: Region = getActiveRegion()): string {
+  const instant = typeof date === 'string' ? new Date(date) : date
+  const time = dateTimeFormat(region.locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: region.timeZone,
+  }).format(instant)
+  return `${format(inTimeZone(instant, region.timeZone), region.dateFormat)} ${time}`
+}
+
+/** Whether the user writes the month before the day (MM/dd/yyyy). */
+export function isMonthFirst(region: Region = getActiveRegion()): boolean {
+  return region.dateFormat.startsWith('MM')
+}
+
+/** Short day and month for chart labels, in the user's order: "26 Sep" or "Sep 26". */
+export function formatDayMonth(date: Date, region: Region = getActiveRegion()): string {
+  return format(date, isMonthFirst(region) ? 'MMM dd' : 'dd MMM')
+}
+
+/** Month label for a yyyy-MM key, e.g. "Sep 26". */
+export function formatMonthLabel(monthKey: string, region: Region = getActiveRegion()): string {
+  const [year, month] = monthKey.split('-').map(Number)
+  return dateTimeFormat(region.locale, { month: 'short', year: '2-digit' }).format(
+    new Date(year, month - 1, 1)
+  )
 }
 
 export function toISODate(date: Date): string {
-  return format(date, DATE_INPUT_FORMAT)
+  return format(date, ISO_DATE_FORMAT)
+}
+
+/** The current wall-clock time in the user's time zone. */
+export function nowInUserTimeZone(region: Region = getActiveRegion()): Date {
+  return inTimeZone(new Date(), region.timeZone)
+}
+
+/** Today's date in the user's time zone (yyyy-MM-dd). */
+export function todayISO(region: Region = getActiveRegion()): string {
+  return toISODate(nowInUserTimeZone(region))
+}
+
+/** Today in the user's time zone, as a local Date at midnight for date arithmetic. */
+export function todayDate(region: Region = getActiveRegion()): Date {
+  return parseISO(todayISO(region))
+}
+
+/** Text formats to try for a typed date, in the order the user writes dates. */
+function textDateFormats(region: Region): string[] {
+  const dayFirst = ['dd/MM/yyyy', 'dd-MM-yyyy', 'dd.MM.yyyy', 'd/M/yyyy', 'd-M-yyyy', 'd.M.yyyy']
+  const monthFirst = ['MM/dd/yyyy', 'MM-dd-yyyy', 'MM.dd.yyyy', 'M/d/yyyy', 'M-d-yyyy', 'M.d.yyyy']
+  const yearFirst = ['yyyy-MM-dd', 'yyyy/MM/dd', 'yyyy.MM.dd']
+  // 05/06/2026 could be either order, so only the user's own order is tried.
+  // Year-first users get year-first formats only.
+  const ambiguous = region.dateFormat.startsWith('yyyy')
+    ? []
+    : isMonthFirst(region)
+      ? monthFirst
+      : dayFirst
+  return [region.dateFormat, ...ambiguous, ...yearFirst]
 }
 
 /**
  * Parse a date coming from a spreadsheet cell, which may arrive as a JS Date
- * (when read with cellDates), an Excel serial number, or a string in a variety
- * of DD/MM/YYYY-style formats. Returns null when nothing usable is found.
+ * (when read with cellDates), an Excel serial number, or text in the user's
+ * date format. Returns null when nothing usable is found.
  */
-export function parseFlexibleDate(value: unknown): Date | null {
+export function parseFlexibleDate(value: unknown, region: Region = getActiveRegion()): Date | null {
   if (value == null || value === '') return null
   if (value instanceof Date) return isValid(value) ? value : null
   if (typeof value === 'number') {
@@ -34,8 +249,7 @@ export function parseFlexibleDate(value: unknown): Date | null {
   }
   const str = String(value).trim()
   if (!str) return null
-  const formats = ['dd/MM/yyyy', 'dd-MM-yyyy', 'd/M/yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'yyyy/MM/dd']
-  for (const fmt of formats) {
+  for (const fmt of textDateFormats(region)) {
     const parsed = parse(str, fmt, new Date())
     if (isValid(parsed)) return parsed
   }
@@ -43,54 +257,18 @@ export function parseFlexibleDate(value: unknown): Date | null {
   return isValid(iso) ? iso : null
 }
 
-export function todayISO(): string {
-  return format(new Date(), DATE_INPUT_FORMAT)
-}
-
-export function formatIndianNumber(value: number, decimals = 0): string {
-  return new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value)
-}
-
-export function formatCurrency(value: number, symbol = '₹'): string {
-  return `${symbol}${formatIndianNumber(value, 2)}`
-}
-
-export function parseAmount(value: string): number {
-  const cleaned = value.replace(/[^0-9.-]/g, '')
-  const num = parseFloat(cleaned)
-  return isNaN(num) ? 0 : num
-}
-
-/** Group a digits-only integer string with the Indian numbering system (1,00,000). */
-function groupIndian(intDigits: string): string {
-  if (intDigits.length <= 3) return intDigits
-  const last3 = intDigits.slice(-3)
-  const rest = intDigits.slice(0, -3)
-  return `${rest.replace(/\B(?=(\d\d)+(?!\d))/g, ',')},${last3}`
-}
-
 /**
- * Format a raw amount string for live display in an input, using Indian
- * grouping (e.g. "100000" -> "1,00,000", "1234.5" -> "1,234.5"). Keeps a
- * trailing "." while the user is still typing the decimal part and caps
- * decimals at 2 places.
+ * Show ISO dates inside free text in the user's date format. History notes
+ * written by the database use yyyy-MM-dd so they read correctly everywhere.
  */
-export function formatAmountInput(raw: string): string {
-  let cleaned = raw.replace(/[^0-9.]/g, '')
-  const firstDot = cleaned.indexOf('.')
-  if (firstDot !== -1) {
-    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '')
-  }
-  const hasDot = cleaned.includes('.')
-  const [intRaw = '', decRaw = ''] = cleaned.split('.')
-  const intClean = intRaw.replace(/^0+(?=\d)/, '')
-  const grouped = groupIndian(intClean)
-  if (!hasDot) return grouped
-  return `${grouped}.${decRaw.slice(0, 2)}`
+export function localizeIsoDates(text: string, region: Region = getActiveRegion()): string {
+  return text.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (iso) => {
+    const d = parseISO(iso)
+    return isValid(d) ? formatDate(d, region) : iso
+  })
 }
+
+/* ---------- Cheque numbers ---------- */
 
 /**
  * Predict the next cheque number by incrementing the trailing numeric run of

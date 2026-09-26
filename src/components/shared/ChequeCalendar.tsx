@@ -9,35 +9,40 @@ import {
   startOfDay,
   endOfDay,
 } from 'date-fns'
-import { enIN } from 'date-fns/locale'
+import { enUS } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DayChequesDialog } from '@/components/shared/DayChequesDialog'
-import { formatCurrency, formatDate } from '@/lib/formatters'
+import { formatCurrency, formatDate, isMonthFirst, todayDate } from '@/lib/formatters'
+import { getActiveRegion } from '@/lib/region'
 import { STATUS_COLORS } from '@/lib/chartUtils'
 import { STATUS_LABELS, type Cheque, type ChequeStatus } from '@/types'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
-  getDay,
-  locales: { 'en-IN': enIN },
-})
-
-// Day-first (Indian) formats. The library defaults are month-first
-// ("Wed Sep 23", "09/23/2026 – 10/23/2026").
-const dayFirstRange = ({ start, end }: { start: Date; end: Date }) =>
-  `${formatDate(start)} – ${formatDate(end)}`
-
-const calendarFormats: Formats = {
-  dayFormat: 'EEE dd',
-  dayHeaderFormat: 'EEEE, dd MMM',
-  dayRangeHeaderFormat: dayFirstRange,
-  agendaHeaderFormat: dayFirstRange,
-  agendaDateFormat: 'EEE, dd MMM',
+/** The calendar in the user's week start and date order. The UI is in English. */
+function useCalendarSetup() {
+  const { weekStartsOn } = getActiveRegion()
+  const monthFirst = isMonthFirst()
+  return useMemo(() => {
+    const localizer = dateFnsLocalizer({
+      format,
+      parse,
+      startOfWeek: (date: Date | number) => startOfWeek(date, { weekStartsOn }),
+      getDay,
+      locales: { en: enUS },
+    })
+    // The library's own defaults are always month-first ("Wed Sep 23").
+    const range = ({ start, end }: { start: Date; end: Date }) => `${formatDate(start)} – ${formatDate(end)}`
+    const formats: Formats = {
+      dayFormat: 'EEE dd',
+      dayHeaderFormat: monthFirst ? 'EEEE, MMM dd' : 'EEEE, dd MMM',
+      dayRangeHeaderFormat: range,
+      agendaHeaderFormat: range,
+      agendaDateFormat: monthFirst ? 'EEE, MMM dd' : 'EEE, dd MMM',
+    }
+    return { localizer, formats }
+  }, [weekStartsOn, monthFirst])
 }
 
 export interface CalendarEvent {
@@ -50,7 +55,6 @@ export interface CalendarEvent {
 
 interface ChequeCalendarProps {
   cheques: Cheque[]
-  currencySymbol?: string
   onSelectCheque?: (chequeId: string) => void
   /**
    * If provided, clicking a date (or an event in month view) calls this
@@ -65,14 +69,14 @@ interface ChequeCalendarProps {
 
 export function ChequeCalendar({
   cheques,
-  currencySymbol = '₹',
   onSelectCheque,
   onDayClick,
   title = 'Cheque Due Calendar',
   defaultView = 'month',
   height = 520,
 }: ChequeCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const { localizer, formats } = useCalendarSetup()
+  const [currentDate, setCurrentDate] = useState(() => todayDate())
   const [view, setView] = useState<View>(defaultView)
   const [internalDay, setInternalDay] = useState<Date | null>(null)
 
@@ -82,7 +86,7 @@ export function ChequeCalendar({
       .map((c) => {
         const day = startOfDay(parseISO(c.due_date))
         const party = c.party?.name ?? 'Unknown'
-        const shortAmount = formatCurrency(Number(c.amount), currencySymbol)
+        const shortAmount = formatCurrency(Number(c.amount))
         return {
           id: c.id,
           title: `${party} · ${shortAmount}`,
@@ -91,7 +95,7 @@ export function ChequeCalendar({
           resource: c,
         }
       })
-  }, [cheques, currencySymbol])
+  }, [cheques])
 
   // Either delegate to parent or open internal modal
   const openDay = useCallback(
@@ -163,8 +167,8 @@ export function ChequeCalendar({
           <div className="cheque-calendar" style={{ height }}>
             <Calendar
               localizer={localizer}
-              culture="en-IN"
-              formats={calendarFormats}
+              culture="en"
+              formats={formats}
               events={events}
               date={currentDate}
               view={view}
@@ -228,7 +232,6 @@ export function ChequeCalendar({
         <DayChequesDialog
           cheques={cheques}
           date={internalDay}
-          currencySymbol={currencySymbol}
           onChangeDate={setInternalDay}
           onClose={() => setInternalDay(null)}
           onSelectCheque={onSelectCheque}

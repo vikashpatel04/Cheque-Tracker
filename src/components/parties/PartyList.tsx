@@ -19,7 +19,6 @@ import { useParties } from '@/hooks/useParties'
 import { useCheques } from '@/hooks/useCheques'
 import { formatCurrency } from '@/lib/formatters'
 import { toast } from 'sonner'
-import { useSettings } from '@/hooks/useSettings'
 import { cn } from '@/lib/utils'
 import { PartyForm } from './PartyForm'
 import { PartyBulkUpload } from './BulkUpload'
@@ -45,7 +44,6 @@ export function PartyList() {
 
   const { parties, loading, createParty, fetchParties } = useParties()
   const { cheques } = useCheques()
-  const { currencySymbol } = useSettings()
 
   // Pre-compute stats per party once, then filter + sort
   const rows = useMemo(() => {
@@ -195,7 +193,7 @@ export function PartyList() {
                     <TableCell className="p-3">{party.bank_name ?? '—'}</TableCell>
                     <TableCell className="p-3 text-right tabular-nums">{party.stats.count}</TableCell>
                     <TableCell className="p-3 text-right tabular-nums">
-                      {formatCurrency(party.stats.outstanding, currencySymbol)}
+                      {formatCurrency(party.stats.outstanding)}
                     </TableCell>
                   </TableRow>
                 ))

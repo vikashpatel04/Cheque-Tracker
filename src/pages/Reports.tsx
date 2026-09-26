@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
-import { addDays, format, startOfDay, subDays } from 'date-fns'
+import { addDays, format, parseISO, subDays } from 'date-fns'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -9,9 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate } from '@/lib/formatters'
+import { formatCurrency, formatDate, formatDayMonth, todayISO } from '@/lib/formatters'
 import { countsAsIssued, isStillToPay } from '@/lib/chequeTags'
-import { useSettings } from '@/hooks/useSettings'
 import { useDeposits } from '@/hooks/useDeposits'
 import { CurrencyTooltip } from '@/components/shared/ChartTooltip'
 import { STATUS_COLORS, CHART_COLORS, formatChartCurrency, formatMonthLabel } from '@/lib/chartUtils'
@@ -37,7 +36,6 @@ import {
 } from 'recharts'
 
 export default function Reports() {
-  const { currencySymbol } = useSettings()
   const { deposits } = useDeposits()
   const [cheques, setCheques] = useState<Cheque[]>([])
   // Cheques that bounced at least once (from history), even if later
@@ -191,8 +189,8 @@ export default function Reports() {
    * Each row aggregates cheque liabilities and deposits made on that date.
    */
   const dailyCashFlow = useMemo(() => {
-    const today = startOfDay(new Date())
-    const todayStr = format(today, 'yyyy-MM-dd')
+    const todayStr = todayISO()
+    const today = parseISO(todayStr)
 
     // Pre-index deposits by deposit_date for O(1) lookup
     const depositsByDate: Record<string, number> = {}
@@ -230,7 +228,7 @@ export default function Reports() {
 
       return {
         date: dateStr,
-        label: format(date, 'dd MMM'),
+        label: formatDayMonth(date),
         weekday: format(date, 'EEE'),
         isPast,
         isToday,
@@ -248,8 +246,7 @@ export default function Reports() {
   }, [cheques, deposits])
 
   const dailySummary = useMemo(() => {
-    const today = startOfDay(new Date())
-    const todayStr = format(today, 'yyyy-MM-dd')
+    const todayStr = todayISO()
     const upcoming = dailyCashFlow.filter((d) => d.date >= todayStr)
     const past = dailyCashFlow.filter((d) => d.date < todayStr)
     return {
@@ -305,10 +302,10 @@ export default function Reports() {
       {/* Summary strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Total Issued', value: formatCurrency(summaryStats.totalIssued, currencySymbol) },
-          { label: 'Paid (cleared)', value: formatCurrency(summaryStats.totalPaid, currencySymbol) },
-          { label: 'Still to pay', value: formatCurrency(summaryStats.totalStillToPay, currencySymbol) },
-          { label: 'Returned (bounced)', value: formatCurrency(summaryStats.totalReturned, currencySymbol) },
+          { label: 'Total Issued', value: formatCurrency(summaryStats.totalIssued) },
+          { label: 'Paid (cleared)', value: formatCurrency(summaryStats.totalPaid) },
+          { label: 'Still to pay', value: formatCurrency(summaryStats.totalStillToPay) },
+          { label: 'Returned (bounced)', value: formatCurrency(summaryStats.totalReturned) },
           { label: 'Cheques', value: String(summaryStats.count) },
         ].map(({ label, value }) => (
           <Card key={label}>
@@ -350,8 +347,8 @@ export default function Reports() {
             {[
               {
                 label: 'Today',
-                value: formatCurrency(dailySummary.todayRequired, currencySymbol),
-                sub: `${formatCurrency(dailySummary.todayDeposited, currencySymbol)} deposited`,
+                value: formatCurrency(dailySummary.todayRequired),
+                sub: `${formatCurrency(dailySummary.todayDeposited)} funds added`,
                 tone:
                   dailySummary.todayRequired > 0 &&
                   dailySummary.todayDeposited < dailySummary.todayRequired
@@ -360,17 +357,17 @@ export default function Reports() {
               },
               {
                 label: 'Next 14 days',
-                value: formatCurrency(dailySummary.next14Required, currencySymbol),
+                value: formatCurrency(dailySummary.next14Required),
                 sub: `${dailySummary.next14Cheques} cheques`,
               },
               {
                 label: 'Past 14 days — required',
-                value: formatCurrency(dailySummary.past14Required, currencySymbol),
+                value: formatCurrency(dailySummary.past14Required),
                 sub: 'cleared cheques',
               },
               {
-                label: 'Past 14 days — deposited',
-                value: formatCurrency(dailySummary.past14Deposited, currencySymbol),
+                label: 'Past 14 days — funds added',
+                value: formatCurrency(dailySummary.past14Deposited),
                 sub: 'logged deposits',
               },
             ].map(({ label, value, sub, tone }) => (
@@ -405,11 +402,11 @@ export default function Reports() {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={1} />
                   <YAxis
-                    tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                    tickFormatter={(v) => formatChartCurrency(v)}
                     tick={{ fontSize: 10 }}
                     width={55}
                   />
-                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <Tooltip content={<CurrencyTooltip />} />
                   <Legend />
                   {todayLabel && (
                     <ReferenceLine
@@ -424,7 +421,7 @@ export default function Reports() {
                     dataKey="deposited"
                     stackId="cheques"
                     fill={STATUS_COLORS.DEPOSITED}
-                    name="Deposited"
+                    name="Funded"
                   />
                   <Bar
                     dataKey="passed"
@@ -462,7 +459,7 @@ export default function Reports() {
                     <TableHead className="p-3 text-foreground">Day</TableHead>
                     <TableHead className="p-3 text-right text-foreground">Cheques</TableHead>
                     <TableHead className="p-3 text-right text-foreground">Pending</TableHead>
-                    <TableHead className="p-3 text-right text-foreground">Deposited</TableHead>
+                    <TableHead className="p-3 text-right text-foreground">Funded</TableHead>
                     <TableHead className="p-3 text-right text-foreground">Required</TableHead>
                     <TableHead className="p-3 text-right text-foreground">Funds Added</TableHead>
                     <TableHead className="p-3 text-right text-foreground">Gap</TableHead>
@@ -490,16 +487,16 @@ export default function Reports() {
                         <TableCell className="p-3">{d.weekday}</TableCell>
                         <TableCell className="p-3 text-right tabular-nums">{d.count || '—'}</TableCell>
                         <TableCell className="p-3 text-right tabular-nums">
-                          {d.pending > 0 ? formatCurrency(d.pending, currencySymbol) : '—'}
+                          {d.pending > 0 ? formatCurrency(d.pending) : '—'}
                         </TableCell>
                         <TableCell className="p-3 text-right tabular-nums">
-                          {d.deposited > 0 ? formatCurrency(d.deposited, currencySymbol) : '—'}
+                          {d.deposited > 0 ? formatCurrency(d.deposited) : '—'}
                         </TableCell>
                         <TableCell className="p-3 text-right font-medium tabular-nums">
-                          {d.cashRequired > 0 ? formatCurrency(d.cashRequired, currencySymbol) : '—'}
+                          {d.cashRequired > 0 ? formatCurrency(d.cashRequired) : '—'}
                         </TableCell>
                         <TableCell className="p-3 text-right tabular-nums text-emerald-600">
-                          {d.depositLog > 0 ? formatCurrency(d.depositLog, currencySymbol) : '—'}
+                          {d.depositLog > 0 ? formatCurrency(d.depositLog) : '—'}
                         </TableCell>
                         <TableCell
                           className={cn(
@@ -510,7 +507,7 @@ export default function Reports() {
                         >
                           {d.cashRequired === 0 && d.depositLog === 0
                             ? '—'
-                            : formatCurrency(d.gap, currencySymbol)}
+                            : formatCurrency(d.gap)}
                         </TableCell>
                       </TableRow>
                     )
@@ -533,8 +530,8 @@ export default function Reports() {
                   <BarChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
-                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <YAxis tickFormatter={(v) => formatChartCurrency(v)} tick={{ fontSize: 10 }} width={55} />
+                    <Tooltip content={<CurrencyTooltip />} />
                     <Legend />
                     <Bar dataKey="issued" fill="#3b82f6" name="Issued" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="paid" fill="#22c55e" name="Paid" radius={[3, 3, 0, 0]} />
@@ -547,15 +544,15 @@ export default function Reports() {
             <Card>
               <CardHeader>
                 <CardTitle>Still to Pay</CardTitle>
-                <CardDescription>Amount from each month's cheques not yet paid (pending, deposited or returned)</CardDescription>
+                <CardDescription>Amount from each month's cheques not yet paid (pending, funded or returned)</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <ComposedChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
-                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <YAxis tickFormatter={(v) => formatChartCurrency(v)} tick={{ fontSize: 10 }} width={55} />
+                    <Tooltip content={<CurrencyTooltip />} />
                     <Legend />
                     <Area type="monotone" dataKey="stillToPay" fill="#f59e0b" stroke="#f59e0b" fillOpacity={0.15} name="Still to pay" />
                     <Line type="monotone" dataKey="issued" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Issued" />
@@ -584,10 +581,10 @@ export default function Reports() {
                     <TableRow key={m.monthKey}>
                       <TableCell className="p-3 font-medium">{m.month}</TableCell>
                       <TableCell className="p-3 text-right">{m.count}</TableCell>
-                      <TableCell className="p-3 text-right">{formatCurrency(m.issued, currencySymbol)}</TableCell>
-                      <TableCell className="p-3 text-right text-green-600">{formatCurrency(m.paid, currencySymbol)}</TableCell>
-                      <TableCell className="p-3 text-right text-red-600">{formatCurrency(m.returned, currencySymbol)}</TableCell>
-                      <TableCell className="p-3 text-right">{formatCurrency(m.stillToPay, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(m.issued)}</TableCell>
+                      <TableCell className="p-3 text-right text-green-600">{formatCurrency(m.paid)}</TableCell>
+                      <TableCell className="p-3 text-right text-red-600">{formatCurrency(m.returned)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(m.stillToPay)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -606,9 +603,9 @@ export default function Reports() {
               <ResponsiveContainer width="100%" height={360}>
                 <BarChart data={topPartyChart} layout="vertical" margin={{ left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                  <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} />
+                  <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v)} tick={{ fontSize: 10 }} />
                   <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} />
-                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <Tooltip content={<CurrencyTooltip />} />
                   <Legend />
                   <Bar dataKey="Still to pay" stackId="a" fill={STATUS_COLORS.PENDING} radius={[0, 0, 0, 0]} />
                   <Bar dataKey="Paid" stackId="a" fill={STATUS_COLORS.PASSED} radius={[0, 4, 4, 0]} />
@@ -633,10 +630,10 @@ export default function Reports() {
                   {partyData.map((p) => (
                     <TableRow key={p.name}>
                       <TableCell className="p-3 font-medium">{p.name}</TableCell>
-                      <TableCell className="p-3 text-right">{formatCurrency(p.issued, currencySymbol)}</TableCell>
-                      <TableCell className="p-3 text-right">{formatCurrency(p.paid, currencySymbol)}</TableCell>
-                      <TableCell className="p-3 text-right">{formatCurrency(p.returned, currencySymbol)}</TableCell>
-                      <TableCell className="p-3 text-right font-medium">{formatCurrency(p.stillToPay, currencySymbol)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(p.issued)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(p.paid)}</TableCell>
+                      <TableCell className="p-3 text-right">{formatCurrency(p.returned)}</TableCell>
+                      <TableCell className="p-3 text-right font-medium">{formatCurrency(p.stillToPay)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -660,7 +657,7 @@ export default function Reports() {
                         <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Tooltip content={<CurrencyTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -675,9 +672,9 @@ export default function Reports() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={bankData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} />
+                    <XAxis type="number" tickFormatter={(v) => formatChartCurrency(v)} tick={{ fontSize: 10 }} />
                     <YAxis type="category" dataKey="bank" width={100} tick={{ fontSize: 11 }} />
-                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Tooltip content={<CurrencyTooltip />} />
                     <Bar dataKey="total" fill="#3b82f6" name="Total Outflow" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -690,15 +687,15 @@ export default function Reports() {
           <Card>
             <CardHeader>
               <CardTitle>Funds Added vs Cheque Payments</CardTitle>
-              <CardDescription>Money we added to the bank compared to our cheques deposited/paid</CardDescription>
+              <CardDescription>Money we added to the bank compared to our cheques funded or paid</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={depositVsOutflow}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={6} />
-                  <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
-                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <YAxis tickFormatter={(v) => formatChartCurrency(v)} tick={{ fontSize: 10 }} width={55} />
+                  <Tooltip content={<CurrencyTooltip />} />
                   <Legend />
                   <Bar dataKey="deposits" fill="#22c55e" name="Funds added" barSize={8} radius={[2, 2, 0, 0]} />
                   <Bar dataKey="outflow" fill="#f59e0b" name="Cheque payments" barSize={8} radius={[2, 2, 0, 0]} />
@@ -719,8 +716,8 @@ export default function Reports() {
                 <ComposedChart data={depositVsOutflow}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={6} />
-                  <YAxis tickFormatter={(v) => formatChartCurrency(v, currencySymbol)} tick={{ fontSize: 10 }} width={55} />
-                  <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                  <YAxis tickFormatter={(v) => formatChartCurrency(v)} tick={{ fontSize: 10 }} width={55} />
+                  <Tooltip content={<CurrencyTooltip />} />
                   <Area type="monotone" dataKey="deposits" fill="#22c55e" stroke="#22c55e" fillOpacity={0.2} name="Funds added" />
                   <Line type="monotone" dataKey="deposits" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} />
                 </ComposedChart>
@@ -744,7 +741,7 @@ export default function Reports() {
                         <Cell key={entry.status} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                    <Tooltip content={<CurrencyTooltip />} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -780,7 +777,7 @@ export default function Reports() {
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.fill }} />
                     <p className="font-medium text-sm">{s.name}</p>
                   </div>
-                  <p className="text-lg font-semibold">{formatCurrency(s.amount, currencySymbol)}</p>
+                  <p className="text-lg font-semibold">{formatCurrency(s.amount)}</p>
                   <p className="text-xs text-muted-foreground">{s.count} cheques</p>
                 </CardContent>
               </Card>

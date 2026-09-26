@@ -4,10 +4,9 @@ interface ChartTooltipProps {
   active?: boolean
   payload?: Array<{ name?: string; value?: number; color?: string; dataKey?: string }>
   label?: string
-  currencySymbol?: string
 }
 
-export function CurrencyTooltip({ active, payload, label, currencySymbol = '₹' }: ChartTooltipProps) {
+export function CurrencyTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null
 
   return (
@@ -21,7 +20,7 @@ export function CurrencyTooltip({ active, payload, label, currencySymbol = '₹'
               style={{ backgroundColor: entry.color }}
             />
             <span className="text-muted-foreground">{entry.name ?? entry.dataKey}:</span>
-            <span className="font-medium">{formatCurrency(Number(entry.value ?? 0), currencySymbol)}</span>
+            <span className="font-medium">{formatCurrency(Number(entry.value ?? 0))}</span>
           </div>
         ))}
       </div>

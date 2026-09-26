@@ -15,7 +15,7 @@ Before opening a new issue, search the existing ones. For anything bigger than a
 
 ## Setting up
 
-Follow [Getting started](./README.md#getting-started) in the README. You'll need Node.js 20+ and a Supabase project of your own (the free tier is enough). Use test data, never real cheques.
+Follow [docs/self-hosting.md](./docs/self-hosting.md). Use a Supabase project of your own for development (the free tier is enough), or run one locally with `npx supabase start`. Use test data, never real cheques.
 
 ## Making a change
 
@@ -24,38 +24,47 @@ Follow [Getting started](./README.md#getting-started) in the README. You'll need
 3. Run the same checks as CI:
    ```bash
    npm run lint    # must pass with no errors
+   npm test        # formatter tests, plus every migration with RLS checks
    npm run build   # type-check + production build
    ```
 4. Try it in the browser, including at phone width. Most of the app is used on phones.
-5. Open a pull request and fill in the template.
+5. Sign off your commits (see below) and open a pull request using the template.
+
+### Sign-off (DCO)
+
+Every commit needs a `Signed-off-by` line, which certifies that you wrote the change or have the right to submit it under this project's license. The terms are the [Developer Certificate of Origin](https://developercertificate.org/). Add the line with `-s`:
+
+```bash
+git commit -s -m "fix(reports): count funded cheques in the weekly total"
+```
 
 ### Commit messages
 
-The history uses [Conventional Commits](https://www.conventionalcommits.org/), and new commits should follow it too:
+Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
 feat(cheques): warn when a cheque number is already in use
-fix(auto-pass): use IST and run the job throughout the day
-chore(lint): fix ESLint config for ESLint 9 flat config
+fix(auto-pass): use each user's own time zone
+docs(regions): add New Zealand
 ```
 
 ## Project conventions
 
 - **UI:** build with the shadcn/ui components in `src/components/ui` and Tailwind. Match the existing look rather than adding new styles.
-- **Money and dates:** use the helpers in `src/lib/formatters.ts`, `formatCurrency` and `formatDate`. Amounts use Indian grouping (₹1,25,000.00), dates display as DD/MM/YYYY, and "today" means India time (IST).
-- **Status changes go through the database.** Use the wrappers in `src/lib/updateChequeStatus.ts`, which call SQL functions such as `change_cheque_status` and `record_deposit`, so that every change is atomic and written to history. Don't update `cheques.status` directly from the client.
+- **No country is hardcoded.** Currency, number and date formats, time zone, week start and cheque rules come from the user's region. Use the helpers in `src/lib/formatters.ts` (`formatCurrency`, `formatDate`, `todayISO`, …) and never a fixed symbol, locale or date pattern. See [docs/regions.md](./docs/regions.md).
+- **Status changes go through the database.** Use the wrappers in `src/lib/updateChequeStatus.ts`, which call SQL functions such as `change_cheque_status` and `record_deposit`. Every change is then atomic and written to history. Don't update `cheques.status` directly from the client.
 - **Keep the transition rules in sync.** `VALID_STATUS_TRANSITIONS` in `src/types/index.ts` mirrors the checks in the SQL functions. If you change one, change the other.
+- **Plans are enforced in the database.** On the hosted edition, `has_write_access()` and row-level security decide who can write; the UI only reflects that. Never let the client write `entitlements` or `instance_config`. See [docs/editions.md](./docs/editions.md).
 
 ### Database changes
 
-- Add a new, numbered file in `supabase/migrations/` (the next one is `010_…`).
-- Keep migrations additive and backward compatible: new nullable or defaulted columns, and new functions. The companion projects read the same database:
+- Add a new, numbered file in `supabase/migrations/` (the next one is `012_…`).
+- Keep migrations additive and backward compatible: new nullable or defaulted columns, and new functions. Self-hosted databases upgrade by applying new files in order.
+- The companion projects read the same database, so say so in the pull request if a change could affect either one:
   - [Cheque Watch](https://github.com/vikashpatel04/cheque-watch#compatibility) reads specific columns of `cheques` and `parties`
   - [cheque-mcp](https://github.com/vikashpatel04/cheque-mcp) reads and writes `cheques`, `parties`, `cheque_history` and `daily_deposits`
-
-  If a change could affect either one, say so in the pull request.
 - Keep row-level security on for every table, and don't hardcode project URLs or keys in migrations.
-- Update `src/types/database.ts` to match.
+- If you change security rules or SQL functions, add a case to `tests/migrations.test.ts`. It applies every migration to an in-memory Postgres and checks behaviour as signed-in users.
 
 ## Secrets and personal data
 
@@ -63,6 +72,6 @@ Never commit `.env` files, API keys, or screenshots and exports that contain rea
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the [MIT License](./LICENSE).
+By contributing, you agree that your contributions are licensed under the [GNU Affero General Public License v3.0](./LICENSE), and you certify the [DCO](https://developercertificate.org/) with your sign-off.
 
 Please also read the [Code of Conduct](./CODE_OF_CONDUCT.md).

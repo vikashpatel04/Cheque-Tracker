@@ -5,15 +5,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// The shop operates in India; due dates and auto_pass_time are IST wall-clock
-// values, while the edge runtime runs in UTC.
-const TIME_ZONE = 'Asia/Kolkata'
+// Each user's due dates and auto_pass_time are wall-clock values in their own
+// time zone (settings.timezone). Users who haven't picked a region yet fall
+// back to the DEFAULT_TIME_ZONE secret, then UTC.
+const FALLBACK_TIME_ZONE = Deno.env.get('DEFAULT_TIME_ZONE') || 'UTC'
 
-/** Current date (yyyy-MM-dd), display date (dd/MM/yyyy) and minutes since midnight in TIME_ZONE. */
-function nowInTimeZone() {
+/** Current date (yyyy-MM-dd) and minutes since midnight in a time zone. Throws for an unknown zone. */
+function nowInTimeZone(timeZone: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: TIME_ZONE,
+      timeZone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -26,15 +27,14 @@ function nowInTimeZone() {
   )
   return {
     isoDate: `${parts.year}-${parts.month}-${parts.day}`,
-    displayDate: `${parts.day}/${parts.month}/${parts.year}`,
     minutes: Number(parts.hour) * 60 + Number(parts.minute),
   }
 }
 
 /**
- * Scheduled job — for each user with auto_pass_enabled, once the IST time is
- * past their auto_pass_time, marks every DEPOSITED cheque whose due_date is
- * on or before today (IST) as PASSED.
+ * Scheduled job — for each user with auto_pass_enabled, once their local time
+ * is past their auto_pass_time, marks every DEPOSITED (funded) cheque whose
+ * due_date is on or before their today as PASSED.
  *
  * PENDING cheques are NEVER auto-passed. Dates are NEVER changed.
  * Each transition goes through change_cheque_status(), which updates the
@@ -49,11 +49,9 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-  const now = nowInTimeZone()
-
   const { data: allSettings, error: settingsError } = await supabase
     .from('settings')
-    .select('user_id, auto_pass_enabled, auto_pass_time')
+    .select('user_id, auto_pass_enabled, auto_pass_time, timezone')
     .eq('auto_pass_enabled', true)
 
   if (settingsError) {
@@ -67,6 +65,15 @@ Deno.serve(async (req) => {
   const errors: string[] = []
 
   for (const settings of allSettings ?? []) {
+    const timeZone = settings.timezone || FALLBACK_TIME_ZONE
+    let now: ReturnType<typeof nowInTimeZone>
+    try {
+      now = nowInTimeZone(timeZone)
+    } catch {
+      errors.push(`${settings.user_id}: unknown time zone "${timeZone}"`)
+      continue
+    }
+
     const [hours, minutes] = (settings.auto_pass_time ?? '23:59:00').split(':').map(Number)
     if (now.minutes < hours * 60 + minutes) continue
 
@@ -89,15 +96,15 @@ Deno.serve(async (req) => {
         p_cheque_id: cheque.id,
         p_new_status: 'PASSED',
         p_changed_by: 'auto',
-        p_note: `Scheduled auto-pass on ${now.displayDate}`,
+        // ISO date: the app shows it in each user's own date format.
+        p_note: `Scheduled auto-pass on ${now.isoDate}`,
       })
       if (rpcError) errors.push(`${cheque.id}: ${rpcError.message}`)
       else totalPassed++
     }
   }
 
-  return new Response(
-    JSON.stringify({ passed: totalPassed, date: now.isoDate, errors }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  )
+  return new Response(JSON.stringify({ passed: totalPassed, errors }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 })

@@ -1,28 +1,28 @@
+import { addDays } from 'date-fns'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import { formatDate } from './formatters'
-import { formatCurrency } from './formatters'
+import { brandSlug } from '@/config/brand'
+import { formatCurrencyCode, formatDate, todayDate } from './formatters'
+import { getActiveRegion } from './region'
 import { STATUS_LABELS, type Cheque, type Party, type ChequeHistory, type DailyDeposit } from '@/types'
 
 interface ExportCheque extends Cheque {
   party?: Party
 }
 
-export function exportChequesToPDF(
-  cheques: ExportCheque[],
-  title: string,
-  currencySymbol = '₹'
-) {
+export function exportChequesToPDF(cheques: ExportCheque[], title: string) {
   const doc = new jsPDF({ orientation: 'landscape' })
   doc.setFontSize(16)
   doc.text(title, 14, 15)
 
+  // Amounts carry the currency code: the built-in PDF fonts can't draw
+  // symbols such as ₹.
   const rows = cheques.map((c) => [
     c.cheque_number,
     c.party?.name ?? '',
     c.bank_name,
-    formatCurrency(Number(c.amount), currencySymbol),
+    formatCurrencyCode(Number(c.amount)),
     formatDate(c.issue_date),
     formatDate(c.due_date),
     STATUS_LABELS[c.status] ?? c.status,
@@ -37,7 +37,7 @@ export function exportChequesToPDF(
   const total = cheques.reduce((sum, c) => sum + Number(c.amount), 0)
   const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
   doc.setFontSize(12)
-  doc.text(`Total: ${formatCurrency(total, currencySymbol)} (${cheques.length} cheques)`, 14, finalY)
+  doc.text(`Total: ${formatCurrencyCode(total)} (${cheques.length} cheques)`, 14, finalY)
 
   doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`)
 }
@@ -130,23 +130,31 @@ export function exportAllData(
     'Deposits'
   )
 
-  XLSX.writeFile(wb, 'cheque_tracker_export.xlsx')
+  XLSX.writeFile(wb, `${brandSlug()}_export.xlsx`)
 }
 
-export function downloadPartyTemplate() {
+/** Column header for a date in the user's format, e.g. "Due Date (DD/MM/YYYY)". */
+function dateHeader(label: string): string {
+  return `${label} (${getActiveRegion().dateFormat.toUpperCase()})`
+}
+
+/** `sampleBank` fills the example row, usually the first bank in the user's list. */
+export function downloadPartyTemplate(sampleBank?: string) {
   const ws = XLSX.utils.aoa_to_sheet([
     ['Party Name', 'Contact Name', 'Phone', 'Bank Name', 'Notes'],
-    ['Example Supplier', 'John Doe', '9876543210', 'HDFC Bank', ''],
+    ['Example Party', 'Contact person', '', sampleBank || 'Your bank', ''],
   ])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Parties')
   XLSX.writeFile(wb, 'party_upload_template.xlsx')
 }
 
-export function downloadChequeTemplate() {
+/** `sampleBank` fills the example row, usually the first bank in the user's list. */
+export function downloadChequeTemplate(sampleBank?: string) {
+  const issued = todayDate()
   const ws = XLSX.utils.aoa_to_sheet([
-    ['Party Name', 'Cheque Number', 'Bank Name', 'Amount', 'Issue Date (DD/MM/YYYY)', 'Due Date (DD/MM/YYYY)', 'Notes'],
-    ['Example Supplier', 'CHQ001', 'HDFC Bank', '50000', '01/01/2025', '15/01/2025', ''],
+    ['Party Name', 'Cheque Number', 'Bank Name', 'Amount', dateHeader('Issue Date'), dateHeader('Due Date'), 'Notes'],
+    ['Example Party', '000001', sampleBank || 'Your bank', 50000, formatDate(issued), formatDate(addDays(issued, 14)), ''],
   ])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Cheques')
@@ -170,4 +178,15 @@ export function parseExcelFile(file: File): Promise<Record<string, unknown>[]> {
     reader.onerror = reject
     reader.readAsArrayBuffer(file)
   })
+}
+
+/**
+ * Value of the first column whose header starts with `prefix`. Templates put
+ * the date format in the header ("Due Date (DD/MM/YYYY)"), and it differs
+ * between regions and older templates.
+ */
+export function columnValue(row: Record<string, unknown>, prefix: string): unknown {
+  const wanted = prefix.toLowerCase()
+  const key = Object.keys(row).find((k) => k.trim().toLowerCase().startsWith(wanted))
+  return key === undefined ? undefined : row[key]
 }

@@ -17,7 +17,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCheques } from '@/hooks/useCheques'
 import { useParties } from '@/hooks/useParties'
-import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { exportChequesToPDF, exportChequesToExcel } from '@/lib/exportUtils'
 import { getChequeTags } from '@/lib/chequeTags'
@@ -66,7 +65,6 @@ export function ChequeList() {
 
   const { cheques: rawCheques, loading, createCheque, updateCheque, fetchCheques } = useCheques(filters)
   const { parties } = useParties()
-  const { currencySymbol } = useSettings()
   const { requestStatus, requestChained, submitting: statusSubmitting, returnDialog } =
     useChequeStatusActions(fetchCheques)
   const { requestRollback, rollbackDialog } = useRollbackAction(fetchCheques)
@@ -131,7 +129,7 @@ export function ChequeList() {
           <Input placeholder="Search cheque or party..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportChequesToPDF(cheques, 'Cheques Export', currencySymbol)}>
+          <Button variant="outline" size="sm" onClick={() => exportChequesToPDF(cheques, 'Cheques Export')}>
             <FileText className="h-4 w-4 mr-1" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportChequesToExcel(cheques, 'cheques_export')}>
@@ -237,7 +235,7 @@ export function ChequeList() {
                       </div>
                     </TableCell>
                     <TableCell className="p-3">{c.bank_name}</TableCell>
-                    <TableCell className="p-3 text-right">{formatCurrency(Number(c.amount), currencySymbol)}</TableCell>
+                    <TableCell className="p-3 text-right">{formatCurrency(Number(c.amount))}</TableCell>
                     <TableCell className="p-3">{formatDate(c.issue_date)}</TableCell>
                     <TableCell className="p-3">{formatDate(c.due_date)}</TableCell>
                     <TableCell className="p-3"><StatusPill status={c.status} /></TableCell>
@@ -281,7 +279,7 @@ export function ChequeList() {
                                   className="font-medium"
                                 >
                                   <CheckCheck className="h-4 w-4" />
-                                  Mark Deposited &amp; Passed
+                                  Mark {STATUS_ACTION_META.DEPOSITED.label} &amp; {STATUS_ACTION_META.PASSED.label}
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />

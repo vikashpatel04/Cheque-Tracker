@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   addDays,
-  startOfDay,
   startOfWeek,
   endOfWeek,
   parseISO,
@@ -13,8 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { supabase } from '@/lib/supabase'
 import { isLegacyRepresented } from '@/lib/chequeTags'
 import { toast } from 'sonner'
-import { formatCurrency, formatDateTime } from '@/lib/formatters'
-import { useSettings } from '@/hooks/useSettings'
+import { formatCurrency, formatDateTime, formatDayMonth, todayISO } from '@/lib/formatters'
+import { getActiveRegion } from '@/lib/region'
 
 import { ChequeDetail } from '@/components/cheques/ChequeDetail'
 import { ChequeForm } from '@/components/cheques/ChequeForm'
@@ -44,7 +43,6 @@ import {
 } from 'recharts'
 
 export default function Dashboard() {
-  const { currencySymbol } = useSettings()
 
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [history, setHistory] = useState<ChequeHistory[]>([])
@@ -79,14 +77,16 @@ export default function Dashboard() {
     loadDashboardData()
   }, [loadDashboardData])
 
-  const today = startOfDay(new Date())
+  const todayStr = todayISO()
+  const today = useMemo(() => parseISO(todayStr), [todayStr])
+  const { weekStartsOn } = getActiveRegion()
 
   const outstanding = cheques
     .filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status))
     .reduce((s, c) => s + Number(c.amount), 0)
 
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(today, { weekStartsOn: 1 })
+  const weekStart = startOfWeek(today, { weekStartsOn })
+  const weekEnd = endOfWeek(today, { weekStartsOn })
   const monthEnd = addDays(today, 30)
 
   const dueThisWeek = cheques.filter((c) => {
@@ -105,10 +105,10 @@ export default function Dashboard() {
   // Old-style re-presented ones were settled through a separate entry.
   const returnedCount = cheques.filter((c) => c.status === 'RETURNED' && !isLegacyRepresented(c)).length
 
-  const overdueCount = useMemo(() => {
-    const todayStr = format(today, 'yyyy-MM-dd')
-    return cheques.filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status) && c.due_date < todayStr).length
-  }, [cheques, today])
+  const overdueCount = useMemo(
+    () => cheques.filter((c) => ['PENDING', 'DEPOSITED'].includes(c.status) && c.due_date < todayStr).length,
+    [cheques, todayStr]
+  )
 
   const calendarDays = useMemo(() => {
     return Array.from({ length: 30 }, (_, i) => {
@@ -120,7 +120,7 @@ export default function Dashboard() {
       const pending = dayCheques.filter((c) => c.status === 'PENDING').reduce((s, c) => s + Number(c.amount), 0)
       const deposited = dayCheques.filter((c) => c.status === 'DEPOSITED').reduce((s, c) => s + Number(c.amount), 0)
       const total = pending + deposited
-      return { date: dateStr, label: format(date, 'dd MMM'), pending, deposited, total, count: dayCheques.length }
+      return { date: dateStr, label: formatDayMonth(date), pending, deposited, total, count: dayCheques.length }
     })
   }, [cheques, today])
 
@@ -219,7 +219,6 @@ export default function Dashboard() {
       ) : (
         <TodayPanel
           cheques={cheques}
-          currencySymbol={currencySymbol}
           onSelectCheque={setDetailId}
         />
       )}
@@ -234,7 +233,6 @@ export default function Dashboard() {
       ) : (
         <Next7DaysStrip
           cheques={cheques}
-          currencySymbol={currencySymbol}
           onDayClick={setSelectedDay}
         />
       )}
@@ -254,12 +252,12 @@ export default function Dashboard() {
         ) : [
           {
             label: 'Total Outstanding',
-            value: formatCurrency(outstanding, currencySymbol),
+            value: formatCurrency(outstanding),
             sub: `${dueThisMonth.length} due this month`,
           },
           {
-            label: 'Due This Week (Mon–Sun)',
-            value: formatCurrency(dueThisWeek.reduce((s, c) => s + Number(c.amount), 0), currencySymbol),
+            label: `Due This Week (${format(weekStart, 'EEE')}–${format(weekEnd, 'EEE')})`,
+            value: formatCurrency(dueThisWeek.reduce((s, c) => s + Number(c.amount), 0)),
             sub: `${dueThisWeek.length} cheques`,
           },
           {
@@ -305,7 +303,6 @@ export default function Dashboard() {
       ) : (
         <ChequeCalendar
           cheques={cheques}
-          currencySymbol={currencySymbol}
           onSelectCheque={setDetailId}
           onDayClick={setSelectedDay}
           title="Monthly Cheque Calendar"
@@ -334,7 +331,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">30-Day Liability Forecast</CardTitle>
-            <CardDescription>Stacked daily outflow — pending vs deposited</CardDescription>
+            <CardDescription>Stacked daily outflow — pending vs funded</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>
@@ -342,14 +339,14 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
                 <YAxis
-                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tickFormatter={(v) => formatChartCurrency(v)}
                   tick={{ fontSize: 10 }}
                   width={55}
                 />
-                <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                <Tooltip content={<CurrencyTooltip />} />
                 <Legend />
                 <Bar dataKey="pending" stackId="a" fill={STATUS_COLORS.PENDING} name="Pending" />
-                <Bar dataKey="deposited" stackId="a" fill={STATUS_COLORS.DEPOSITED} name="Deposited" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="deposited" stackId="a" fill={STATUS_COLORS.DEPOSITED} name="Funded" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -372,11 +369,11 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
                 <YAxis
-                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tickFormatter={(v) => formatChartCurrency(v)}
                   tick={{ fontSize: 10 }}
                   width={55}
                 />
-                <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                <Tooltip content={<CurrencyTooltip />} />
                 <Area
                   type="monotone"
                   dataKey="cumulative"
@@ -434,7 +431,7 @@ export default function Dashboard() {
                     <Cell key={entry.status} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                <Tooltip content={<CurrencyTooltip />} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -452,11 +449,11 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis
-                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tickFormatter={(v) => formatChartCurrency(v)}
                   tick={{ fontSize: 10 }}
                   width={55}
                 />
-                <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                <Tooltip content={<CurrencyTooltip />} />
                 <Legend />
                 <Bar dataKey="issued" fill="#3b82f6" name="Issued" barSize={16} radius={[3, 3, 0, 0]} />
                 <Bar dataKey="due" fill="#f59e0b" name="Due" barSize={16} radius={[3, 3, 0, 0]} />
@@ -481,7 +478,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Top Outstanding by Party</CardTitle>
-            <CardDescription>Largest pending + deposited amounts</CardDescription>
+            <CardDescription>Largest pending + funded amounts</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={Math.max(180, topParties.length * 40)}>
@@ -489,11 +486,11 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
                 <XAxis
                   type="number"
-                  tickFormatter={(v) => formatChartCurrency(v, currencySymbol)}
+                  tickFormatter={(v) => formatChartCurrency(v)}
                   tick={{ fontSize: 10 }}
                 />
                 <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
-                <Tooltip content={<CurrencyTooltip currencySymbol={currencySymbol} />} />
+                <Tooltip content={<CurrencyTooltip />} />
                 <Bar dataKey="outstanding" fill="#8b5cf6" name="Outstanding" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -519,10 +516,10 @@ export default function Dashboard() {
             history.map((h) => {
               const cheque = h.cheque as Cheque | undefined
               const partyName = cheque?.party?.name ?? 'Unknown'
-              const amount = cheque ? formatCurrency(Number(cheque.amount), currencySymbol) : ''
+              const amount = cheque ? formatCurrency(Number(cheque.amount)) : ''
               const via =
                 h.changed_by === 'deposit_allocation'
-                  ? ' via deposit allocation'
+                  ? ' via Add funds'
                   : h.changed_by === 'auto'
                   ? ' (auto)'
                   : h.changed_by === 'rollback'
@@ -556,7 +553,6 @@ export default function Dashboard() {
       <DayChequesDialog
         cheques={cheques}
         date={selectedDay}
-        currencySymbol={currencySymbol}
         onChangeDate={setSelectedDay}
         onClose={() => setSelectedDay(null)}
         onSelectCheque={setDetailId}

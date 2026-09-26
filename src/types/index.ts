@@ -1,3 +1,5 @@
+import type { DateFormat, WeekStart } from '@/config/regions'
+
 export type ChequeStatus =
   | 'PENDING'
   | 'DEPOSITED'
@@ -75,22 +77,58 @@ export interface DailyDeposit {
 export interface Settings {
   id: string
   user_id: string
+  /** Wall-clock time in the user's own time zone (`timezone`). */
   auto_pass_time: string
   /**
-   * When true, DEPOSITED cheques past their due date are auto-marked PASSED
-   * at the auto_pass_time. PENDING cheques are never auto-passed.
+   * When true, DEPOSITED (funded) cheques past their due date are auto-marked
+   * PASSED at the auto_pass_time. PENDING cheques are never auto-passed.
    * When false (default), no automatic transitions occur.
    * Cheque dates never change regardless of this setting.
    */
   auto_pass_enabled: boolean
-  currency_symbol: string
+  /** Symbol of `currency_code`, kept up to date for older clients. */
+  currency_symbol: string | null
   allocation_sort: AllocationSort
   /**
    * User-configured list of banks for dropdown selection.
    */
   banks: string[]
+  /** Region. `country_code` is null until the user picks a country. See src/lib/region.ts. */
+  country_code: string | null
+  currency_code: string | null
+  locale: string | null
+  timezone: string | null
+  date_format: DateFormat | null
+  week_starts_on: WeekStart | null
+  cheque_validity_months: number | null
   created_at: string
   updated_at: string
+}
+
+export type SettingsUpdate = Partial<Omit<Settings, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+
+/**
+ * One row per instance. Self-hosted copies leave billing off, so every
+ * feature is free and there are no plans. See docs/editions.md.
+ */
+export interface InstanceConfig {
+  billing_enabled: boolean
+  trial_days: number
+  default_country_code: string | null
+}
+
+/** Right to use the app on an instance with billing on. Written only by the server. */
+export interface Entitlement {
+  id: string
+  user_id: string
+  plan: string
+  source: 'trial' | 'purchase' | 'comp'
+  starts_at: string
+  /** Null for grants that never expire. */
+  expires_at: string | null
+  payment_ref: string | null
+  note: string | null
+  created_at: string
 }
 
 export interface UpdateChequeStatusOptions {
@@ -120,9 +158,14 @@ export const VALID_STATUS_TRANSITIONS: Record<ChequeStatus, ChequeStatus[]> = {
 
 export const ALL_STATUSES: ChequeStatus[] = ['PENDING', 'DEPOSITED', 'PASSED', 'RETURNED', 'CANCELLED', 'WRITTEN_OFF']
 
+/**
+ * DEPOSITED means the money to cover the cheque is in the bank (logged with
+ * "Add funds"), so it's shown as Funded. The stored value stays DEPOSITED for
+ * cheque-mcp and Cheque Watch.
+ */
 export const STATUS_LABELS: Record<ChequeStatus, string> = {
   PENDING: 'Pending',
-  DEPOSITED: 'Deposited',
+  DEPOSITED: 'Funded',
   PASSED: 'Passed',
   RETURNED: 'Returned',
   CANCELLED: 'Cancelled',

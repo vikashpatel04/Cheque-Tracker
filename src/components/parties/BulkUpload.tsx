@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { downloadPartyTemplate, parseExcelFile } from '@/lib/exportUtils'
 import { useParties } from '@/hooks/useParties'
+import { useSettings } from '@/hooks/useSettings'
 import { toast } from 'sonner'
 
 interface BulkUploadProps {
@@ -25,6 +26,7 @@ interface PreviewRow {
 
 export function PartyBulkUpload({ open, onOpenChange, onComplete }: BulkUploadProps) {
   const { parties, createParty } = useParties(true)
+  const { banks } = useSettings()
   const [preview, setPreview] = useState<PreviewRow[]>([])
   const [step, setStep] = useState<'upload' | 'preview'>('upload')
   const [submitting, setSubmitting] = useState(false)
@@ -96,7 +98,7 @@ export function PartyBulkUpload({ open, onOpenChange, onComplete }: BulkUploadPr
 
         {step === 'upload' ? (
           <div className="space-y-4">
-            <Button variant="outline" onClick={downloadPartyTemplate}>Download Template</Button>
+            <Button variant="outline" onClick={() => downloadPartyTemplate(banks[0])}>Download Template</Button>
             <div className="grid w-full max-w-sm items-center gap-2">
               <Label htmlFor="party-bulk-file">Excel file</Label>
               <Input

@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase'
 import { countsAsIssued } from '@/lib/chequeTags'
 import { ALL_STATUSES, STATUS_LABELS, type Party, type Cheque, type ChequeStatus } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/formatters'
-import { useSettings } from '@/hooks/useSettings'
 import { StatusPill } from '@/components/shared/StatusPill'
 import { PartyForm } from './PartyForm'
 import { useParties } from '@/hooks/useParties'
@@ -20,7 +19,6 @@ import { useParties } from '@/hooks/useParties'
 export function PartyDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { currencySymbol } = useSettings()
   const { updateParty, softDeleteParty } = useParties(true)
   const [party, setParty] = useState<Party | null>(null)
   const [cheques, setCheques] = useState<Cheque[]>([])
@@ -155,7 +153,7 @@ export function PartyDetail() {
           <Card key={label}>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-lg font-semibold">{formatCurrency(value, currencySymbol)}</p>
+              <p className="text-lg font-semibold">{formatCurrency(value)}</p>
             </CardContent>
           </Card>
         ))}
@@ -194,7 +192,7 @@ export function PartyDetail() {
               {filtered.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="p-3">{c.cheque_number}</TableCell>
-                  <TableCell className="p-3">{formatCurrency(Number(c.amount), currencySymbol)}</TableCell>
+                  <TableCell className="p-3">{formatCurrency(Number(c.amount))}</TableCell>
                   <TableCell className="p-3">{formatDate(c.due_date)}</TableCell>
                   <TableCell className="p-3"><StatusPill status={c.status} /></TableCell>
                 </TableRow>

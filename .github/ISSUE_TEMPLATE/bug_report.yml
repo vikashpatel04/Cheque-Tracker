@@ -20,7 +20,9 @@ body:
         - Parties
         - Bulk add / Excel upload
         - Reports / exports
+        - Region (currency, number and date formats, time zone)
         - Settings / auto-pass
+        - Plan / hosted edition
         - Login / install (PWA)
         - Database / migrations
         - Other
@@ -59,7 +61,7 @@ body:
     attributes:
       label: Latest migration applied
       description: The highest-numbered file from supabase/migrations/ that's applied to your database.
-      placeholder: e.g. 009_represent_writeoff_rollback.sql
+      placeholder: e.g. 011_editions.sql
   - type: textarea
     id: extra
     attributes:

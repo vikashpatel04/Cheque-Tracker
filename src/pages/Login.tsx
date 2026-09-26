@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { AppLogo } from '@/components/shared/AppLogo'
+import { SourceLink } from '@/components/shared/SourceLink'
+import { brand } from '@/config/brand'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -42,13 +44,13 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-muted/30">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-4 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-2">
             <AppLogo size="lg" showText={false} />
           </div>
-          <CardTitle className="text-2xl">Cheque Tracker</CardTitle>
+          <CardTitle className="text-2xl">{brand.name}</CardTitle>
           <CardDescription>Sign in to manage your cheques</CardDescription>
         </CardHeader>
         <CardContent>
@@ -70,6 +72,7 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
+      <SourceLink />
     </div>
   )
 }

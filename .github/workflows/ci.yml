@@ -19,5 +19,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # Formatting in several regions, plus every migration applied to an
+      # in-memory Postgres with row-level security checks.
+      - run: npm test
       # Type-check + production build. No Supabase keys are needed at build time.
       - run: npm run build

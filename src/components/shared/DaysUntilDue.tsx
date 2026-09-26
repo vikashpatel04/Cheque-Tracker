@@ -1,5 +1,6 @@
-import { differenceInDays, parseISO, startOfDay } from 'date-fns'
+import { differenceInDays, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { todayDate } from '@/lib/formatters'
 import { CLOSED_STATUSES } from '@/types'
 
 interface DaysUntilDueProps {
@@ -14,9 +15,9 @@ export function DaysUntilDue({ dueDate, status, className }: DaysUntilDueProps) 
     return <span className={cn('text-sm text-muted-foreground', className)}>—</span>
   }
 
-  const days = differenceInDays(startOfDay(parseISO(dueDate)), startOfDay(new Date()))
+  const days = differenceInDays(parseISO(dueDate), todayDate())
 
-  // DEPOSITED — the cheque has been handed to the bank; the user's action is
+  // DEPOSITED (funded) — the money is in the bank; the user's action is
   // done. Never label it as "overdue" (that just creates anxiety). Show a
   // neutral "Awaiting clearance" instead, with optional days-until-due context
   // for cheques still in the future.

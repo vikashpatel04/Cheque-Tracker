@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/formatters'
-import { useSettings } from '@/hooks/useSettings'
 import { RePresentDrawer } from '@/components/cheques/RePresentDrawer'
 import { WriteOffDialog } from '@/components/cheques/WriteOffDialog'
 import { getChequeTags, isLegacyRepresented, stripTagLines } from '@/lib/chequeTags'
@@ -16,7 +15,6 @@ import type { Cheque } from '@/types'
  * cheque (the party deposits it again) or write it off and issue a new one.
  */
 export default function Returned() {
-  const { currencySymbol } = useSettings()
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [loading, setLoading] = useState(true)
   const [partyFilter, setPartyFilter] = useState('')
@@ -68,7 +66,7 @@ export default function Returned() {
             <>
               <div>
                 <p className="text-xs text-muted-foreground">Still owed on returned cheques</p>
-                <p className="text-xl font-semibold">{formatCurrency(totalNeedsAction, currencySymbol)}</p>
+                <p className="text-xl font-semibold">{formatCurrency(totalNeedsAction)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Needs action</p>
@@ -128,7 +126,7 @@ export default function Returned() {
                           </span>
                         ))}
                       </div>
-                      <p className="text-lg font-semibold">{formatCurrency(Number(c.amount), currencySymbol)}</p>
+                      <p className="text-lg font-semibold">{formatCurrency(Number(c.amount))}</p>
                       <p className="text-sm text-muted-foreground">
                         Due: {formatDate(c.due_date)}
                         {c.original_due_date && c.original_due_date !== c.due_date && (

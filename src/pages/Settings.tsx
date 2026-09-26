@@ -20,15 +20,16 @@ import {
 import { useSettings } from '@/hooks/useSettings'
 import { supabase } from '@/lib/supabase'
 import { exportAllData } from '@/lib/exportUtils'
+import { PlanCard } from '@/components/settings/PlanCard'
+import { RegionSettingsCard } from '@/components/settings/RegionSettingsCard'
 import type { AllocationSort } from '@/types'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
-  const { settings, loading, updateSettings } = useSettings()
+  const { settings, region, updateSettings } = useSettings()
   const [autoPassEnabled, setAutoPassEnabled] = useState(settings?.auto_pass_enabled ?? false)
   const [autoPassTime, setAutoPassTime] = useState(settings?.auto_pass_time?.slice(0, 5) ?? '23:59')
   const [allocationSort, setAllocationSort] = useState<AllocationSort>(settings?.allocation_sort ?? 'due_date_asc')
-  const [currency, setCurrency] = useState(settings?.currency_symbol ?? '₹')
   const [banksList, setBanksList] = useState<string[]>(settings?.banks ?? [])
   const [newBank, setNewBank] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -42,7 +43,6 @@ export default function SettingsPage() {
     setAutoPassEnabled(settings.auto_pass_enabled ?? false)
     setAutoPassTime(settings.auto_pass_time?.slice(0, 5) ?? '23:59')
     setAllocationSort(settings.allocation_sort ?? 'due_date_asc')
-    setCurrency(settings.currency_symbol ?? '₹')
     setBanksList(settings.banks ?? [])
   }, [settings])
 
@@ -53,7 +53,6 @@ export default function SettingsPage() {
       auto_pass_enabled: autoPassEnabled,
       auto_pass_time: `${autoPassTime}:00`,
       allocation_sort: allocationSort,
-      currency_symbol: currency,
       banks: banksList,
     })
     setSaving(false)
@@ -96,8 +95,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-lg">
+    <div className="space-y-6 max-w-2xl">
       <h2 className="text-2xl font-bold">Settings</h2>
+
+      <PlanCard />
+
+      <RegionSettingsCard />
 
       <Card>
         <CardHeader>
@@ -108,12 +111,12 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <Label htmlFor="auto_pass_enabled" className="text-sm font-medium">
-                  Auto-pass deposited cheques on due date
+                  Auto-pass funded cheques on due date
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {autoPassEnabled
-                    ? 'At the scheduled time, deposited cheques past their due date are marked Passed automatically.'
-                    : 'Deposited cheques will stay in their current status until you manually mark them Passed. Pending cheques always require manual action.'}
+                    ? 'At the scheduled time, funded cheques past their due date are marked Passed automatically.'
+                    : 'Funded cheques will stay in their current status until you manually mark them Passed. Pending cheques always require manual action.'}
                 </p>
               </div>
               <Switch
@@ -133,7 +136,8 @@ export default function SettingsPage() {
                   onChange={(e) => setAutoPassTime(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Deposited cheques past their due date are marked Passed after this time.
+                  Funded cheques past their due date are marked Passed after this time
+                  {region ? ` (${region.timeZone} time)` : ''}.
                 </p>
               </div>
             )}
@@ -149,11 +153,6 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="currency">Currency Symbol</Label>
-            <Input id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-20" />
-          </div>
-
           <div className="pt-2 border-t">
             <Label>Bank List</Label>
             <p className="text-xs text-muted-foreground mb-3">
@@ -190,7 +189,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <Button onClick={handleSave} disabled={saving || loading || !settings}>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>
         </CardContent>

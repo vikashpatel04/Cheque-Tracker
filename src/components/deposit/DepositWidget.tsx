@@ -6,13 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useDeposits } from '@/hooks/useDeposits'
-import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency } from '@/lib/formatters'
 import { AllocationModal } from './AllocationModal'
 
 export function DepositWidget() {
   const { todayTotal, addDeposit } = useDeposits()
-  const { currencySymbol } = useSettings()
   const [showAmountModal, setShowAmountModal] = useState(false)
   const [showAllocation, setShowAllocation] = useState(false)
   const [amount, setAmount] = useState('')
@@ -40,7 +38,7 @@ export function DepositWidget() {
     <>
       <div className="flex items-center gap-2">
         <div className="rounded-lg border bg-card px-3 py-1.5 text-sm font-medium">
-          <span className="text-muted-foreground font-normal">Funds added today:</span> {formatCurrency(todayTotal, currencySymbol)}
+          <span className="text-muted-foreground font-normal">Funds added today:</span> {formatCurrency(todayTotal)}
         </div>
         <Button size="sm" onClick={() => setShowAmountModal(true)} className="gap-1">
           <Plus className="h-4 w-4" />

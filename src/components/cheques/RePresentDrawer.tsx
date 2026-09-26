@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { representCheque } from '@/lib/updateChequeStatus'
 import { todayISO, formatCurrency, formatDate } from '@/lib/formatters'
-import { useSettings } from '@/hooks/useSettings'
+import { getActiveRegion } from '@/lib/region'
 import { toast } from 'sonner'
 import type { Cheque } from '@/types'
 
@@ -28,10 +28,9 @@ interface RePresentDrawerProps {
 /**
  * Re-present a returned cheque: the party deposits the SAME cheque again.
  * It goes back to Pending with the new expected date (or straight to
- * Deposited) and then follows the normal life cycle.
+ * Funded) and then follows the normal life cycle.
  */
 export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePresentDrawerProps) {
-  const { currencySymbol } = useSettings()
   const [newDueDate, setNewDueDate] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -47,9 +46,11 @@ export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePre
 
   if (!cheque) return null
 
-  // Cheques are valid for 3 months from the date written on them.
+  // Banks refuse cheques older than the validity period set for the user's
+  // region (counted from the date written on the cheque).
+  const { chequeValidityMonths } = getActiveRegion()
   const chequeDate = cheque.original_due_date ?? cheque.due_date
-  const validTill = format(addMonths(parseISO(chequeDate), 3), 'yyyy-MM-dd')
+  const validTill = format(addMonths(parseISO(chequeDate), chequeValidityMonths), 'yyyy-MM-dd')
   const pastValidity = !!newDueDate && newDueDate > validTill
 
   const save = async (markDeposited: boolean) => {
@@ -69,7 +70,7 @@ export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePre
     }
     toast.success(
       markDeposited
-        ? `Cheque #${cheque.cheque_number} re-presented and marked Deposited`
+        ? `Cheque #${cheque.cheque_number} re-presented and marked Funded`
         : `Cheque #${cheque.cheque_number} re-presented — due ${formatDate(newDueDate)}`
     )
     onOpenChange(false)
@@ -88,7 +89,7 @@ export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePre
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-2">Returned cheque</p>
           <p><span className="text-muted-foreground">Party:</span> <span className="font-medium">{cheque.party?.name}</span></p>
           <p><span className="text-muted-foreground">Bank:</span> {cheque.bank_name}</p>
-          <p><span className="text-muted-foreground">Amount:</span> <span className="font-semibold">{formatCurrency(Number(cheque.amount), currencySymbol)}</span></p>
+          <p><span className="text-muted-foreground">Amount:</span> <span className="font-semibold">{formatCurrency(Number(cheque.amount))}</span></p>
           <p><span className="text-muted-foreground">Cheque date:</span> {formatDate(chequeDate)}</p>
           {cheque.original_due_date && cheque.original_due_date !== cheque.due_date && (
             <p><span className="text-muted-foreground">Last presented for:</span> {formatDate(cheque.due_date)}</p>
@@ -112,7 +113,7 @@ export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePre
             {error && <p className="text-sm text-destructive mt-1">{error}</p>}
             {pastValidity && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                This is after {formatDate(validTill)} — more than 3 months from the cheque date. The bank may refuse a stale cheque.
+                This is after {formatDate(validTill)}, more than {chequeValidityMonths} month{chequeValidityMonths === 1 ? '' : 's'} from the cheque date. The bank may refuse a stale cheque.
               </p>
             )}
           </div>
@@ -163,7 +164,7 @@ export function RePresentDrawer({ cheque, open, onOpenChange, onSuccess }: RePre
                     Save (Pending)
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => void save(true)}>
-                    Save as Deposited
+                    Save as Funded
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
