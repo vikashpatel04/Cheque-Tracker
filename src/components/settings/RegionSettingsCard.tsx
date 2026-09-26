@@ -207,7 +207,25 @@ export function RegionSettingsCard() {
               className="w-24"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              After this, banks treat a cheque as stale. Used for re-present warnings.
+              After this, banks treat a cheque as stale. Used for stale-cheque warnings.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="region-clearing">Deposits usually clear within (days)</Label>
+            <Input
+              id="region-clearing"
+              type="number"
+              min={0}
+              max={30}
+              value={draft.clearingDays}
+              onChange={(e) => {
+                const days = Math.round(Number(e.target.value))
+                if (days >= 0 && days <= 30) set('clearingDays', days)
+              }}
+              className="w-24"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              After this, the app asks whether a deposited cheque has cleared.
             </p>
           </div>
         </div>

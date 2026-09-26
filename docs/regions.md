@@ -12,7 +12,8 @@ Nothing in Cheque Tracker is fixed to one country. Each user has a **region** in
 | Date format | `date_format` (e.g. `dd/MM/yyyy`) | How dates are shown and typed, Excel templates and import |
 | Time zone | `timezone` (IANA, e.g. `Asia/Kolkata`) | What "today" is, timestamps, and the auto-pass time |
 | Week start | `week_starts_on` (0 Sunday, 1 Monday, 6 Saturday) | "This week" totals and calendars |
-| Cheque validity | `cheque_validity_months` | Stale-cheque warnings when re-presenting |
+| Cheque validity | `cheque_validity_months` | Stale-cheque warnings |
+| Clearing time | `clearing_days` | When to ask whether a deposited cheque has cleared |
 
 `currency_symbol` is still filled in, from the currency, for older clients.
 
@@ -20,21 +21,21 @@ Nothing in Cheque Tracker is fixed to one country. Each user has a **region** in
 
 Defined in `src/config/regions.ts`:
 
-| Country | Currency | Date format | Week starts | Cheques valid for |
-|---|---|---|---|---|
-| India | INR | dd/MM/yyyy | Monday | 3 months |
-| United Arab Emirates | AED | dd/MM/yyyy | Monday | 6 months |
-| Singapore | SGD | dd/MM/yyyy | Monday | 6 months |
-| United Kingdom | GBP | dd/MM/yyyy | Monday | 6 months |
-| United States | USD | MM/dd/yyyy | Sunday | 6 months |
-| Canada | CAD | yyyy-MM-dd | Sunday | 6 months |
-| Australia | AUD | dd/MM/yyyy | Monday | 15 months |
+| Country | Currency | Date format | Week starts | Cheques valid for | Clearing |
+|---|---|---|---|---|---|
+| India | INR | dd/MM/yyyy | Monday | 3 months | 2 days |
+| United Arab Emirates | AED | dd/MM/yyyy | Monday | 6 months | 2 days |
+| Singapore | SGD | dd/MM/yyyy | Monday | 6 months | 2 days |
+| United Kingdom | GBP | dd/MM/yyyy | Monday | 6 months | 2 days |
+| United States | USD | MM/dd/yyyy | Sunday | 6 months | 2 days |
+| Canada | CAD | yyyy-MM-dd | Sunday | 6 months | 2 days |
+| Australia | AUD | dd/MM/yyyy | Monday | 15 months | 3 days |
 
-Validity follows usual bank practice in each country. Confirm it with someone local before promoting the app there. A user whose country isn't listed picks the closest one and adjusts each setting.
+Validity and clearing times follow usual bank practice in each country. Confirm them with someone local before promoting the app there. A user whose country isn't listed picks the closest one and adjusts each setting.
 
 ## Adding a country
 
-1. Add an entry to `REGION_PRESETS` in `src/config/regions.ts`: currency, locale, time zones, date format, week start, cheque validity and suggested banks.
+1. Add an entry to `REGION_PRESETS` in `src/config/regions.ts`: currency, locale, time zones, date format, week start, cheque validity, clearing time and suggested banks.
 2. Check the rules with someone who uses cheques there.
 3. If its formats are unusual, add a case to `tests/formatters.test.ts`, then run `npm test`.
 

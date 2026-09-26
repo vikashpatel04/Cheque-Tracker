@@ -22,7 +22,9 @@ import { supabase } from '@/lib/supabase'
 import { exportAllData } from '@/lib/exportUtils'
 import { PlanCard } from '@/components/settings/PlanCard'
 import { RegionSettingsCard } from '@/components/settings/RegionSettingsCard'
-import type { AllocationSort } from '@/types'
+import { fetchAllRows } from '@/lib/fetchAll'
+import type { AllocationSort, Cheque, ChequeHistory, DailyDeposit, Party } from '@/types'
+import type { BankAccount, ReceivedCheque, ReceivedChequeHistory } from '@/types/received'
 import { toast } from 'sonner'
 
 export default function SettingsPage() {
@@ -74,22 +76,43 @@ export default function SettingsPage() {
   }
 
   const handleExport = async () => {
-    const { data: parties } = await supabase.from('parties').select('*').is('deleted_at', null)
-    const { data: cheques } = await supabase.from('cheques').select('*, party:parties(*)').is('deleted_at', null)
-    const { data: history } = await supabase.from('cheque_history').select('*')
-    const { data: deposits } = await supabase.from('daily_deposits').select('*')
-
-    exportAllData(parties ?? [], cheques ?? [], history ?? [], deposits ?? [])
+    const results = await Promise.all([
+      fetchAllRows<Party>('parties', '*', { activeOnly: true }),
+      fetchAllRows<Cheque>('cheques', '*, party:parties(*)', { activeOnly: true }),
+      fetchAllRows<ChequeHistory>('cheque_history'),
+      fetchAllRows<DailyDeposit>('daily_deposits'),
+      fetchAllRows<ReceivedCheque>('received_cheques', '*, party:parties(*)', { activeOnly: true }),
+      fetchAllRows<ReceivedChequeHistory>('received_cheque_history'),
+      fetchAllRows<BankAccount>('bank_accounts', '*', { activeOnly: true }),
+    ])
+    const failed = results.find((r) => r.error)
+    if (failed) {
+      toast.error(`Export failed, nothing was downloaded: ${failed.error}`)
+      return
+    }
+    const [parties, cheques, history, deposits, received, receivedHistory, accounts] = results
+    exportAllData({
+      parties: parties.rows as Party[],
+      cheques: cheques.rows as Cheque[],
+      history: history.rows as ChequeHistory[],
+      deposits: deposits.rows as DailyDeposit[],
+      received: received.rows as ReceivedCheque[],
+      receivedHistory: receivedHistory.rows as ReceivedChequeHistory[],
+      accounts: accounts.rows as BankAccount[],
+    })
     toast.success('Data exported')
   }
 
   const handleDeleteAll = async () => {
     if (deleteConfirm !== 'DELETE MY DATA') return
     const now = new Date().toISOString()
-    const { error: chequesError } = await supabase.from('cheques').update({ deleted_at: now }).is('deleted_at', null)
-    if (chequesError) { toast.error(chequesError.message); return }
-    const { error: partiesError } = await supabase.from('parties').update({ deleted_at: now }).is('deleted_at', null)
-    if (partiesError) { toast.error(partiesError.message); return }
+    for (const table of ['received_cheques', 'cheques', 'bank_accounts', 'parties']) {
+      const { error } = await supabase.from(table).update({ deleted_at: now }).is('deleted_at', null)
+      if (error) {
+        toast.error(error.message)
+        return
+      }
+    }
     toast.success('All data deleted')
     setDeleteConfirm('')
   }
@@ -208,7 +231,7 @@ export default function SettingsPage() {
       <Card className="border-destructive">
         <CardHeader>
           <CardTitle className="text-destructive">Danger Zone</CardTitle>
-          <CardDescription>Permanently soft-delete all parties and cheques</CardDescription>
+          <CardDescription>Soft-delete all parties, cheques (given and received) and bank accounts</CardDescription>
         </CardHeader>
         <CardContent>
           <AlertDialog>
@@ -219,7 +242,7 @@ export default function SettingsPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Type <strong>DELETE MY DATA</strong> to confirm. This will soft-delete all parties and cheques.
+                  Type <strong>DELETE MY DATA</strong> to confirm. This will soft-delete all parties, cheques (given and received) and bank accounts.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <Input

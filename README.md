@@ -81,7 +81,7 @@ RETURNED  ──► write off  ──► WRITTEN_OFF         (a replacement can 
 
 ## Roadmap
 
-- **Received cheques:** track cheques other people give you, with deposit reminders, clearing and bounce follow-up.
+- **Received cheques** (in progress): track cheques other people give you, with deposits, clearing, bounces, security cheques and series. The database side is done and tested ([docs/received-cheques.md](./docs/received-cheques.md)); the screens come with the redesign.
 - A redesigned dashboard and reports covering both directions.
 - Sign-up and onboarding.
 - Plans and payments for the hosted edition.
@@ -146,10 +146,10 @@ src/
   lib/              Supabase client, region and formatters, RPC wrappers, allocation, exports
   types/            app and database types
 supabase/
-  migrations/       001–011: schema, RLS, functions, regions, editions
+  migrations/       001–012: schema, RLS, functions, regions, editions, received cheques
   functions/        auto-pass Edge Function
-tests/              formatter tests and migration/RLS tests
-docs/               editions, self-hosting, regions
+tests/              formatter, schedule and migration/RLS tests
+docs/               editions, self-hosting, regions, received cheques
 ```
 
 ---

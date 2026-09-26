@@ -17,6 +17,7 @@ export interface Region {
   dateFormat: DateFormat
   weekStartsOn: WeekStart
   chequeValidityMonths: number
+  clearingDays: number
 }
 
 export function regionFromPreset(preset: RegionPreset, timeZone = preset.timeZone): Region {
@@ -28,6 +29,7 @@ export function regionFromPreset(preset: RegionPreset, timeZone = preset.timeZon
     dateFormat: preset.dateFormat,
     weekStartsOn: preset.weekStartsOn,
     chequeValidityMonths: preset.chequeValidityMonths,
+    clearingDays: preset.clearingDays,
   }
 }
 
@@ -55,6 +57,7 @@ export function regionFromSettings(settings: Settings): Region | null {
     dateFormat: settings.date_format ?? base.dateFormat,
     weekStartsOn: settings.week_starts_on ?? base.weekStartsOn,
     chequeValidityMonths: settings.cheque_validity_months ?? base.chequeValidityMonths,
+    clearingDays: settings.clearing_days ?? base.clearingDays,
   }
 }
 
@@ -68,6 +71,7 @@ export function regionToSettings(region: Region) {
     date_format: region.dateFormat,
     week_starts_on: region.weekStartsOn,
     cheque_validity_months: region.chequeValidityMonths,
+    clearing_days: region.clearingDays,
     currency_symbol: currencySymbolFor(region),
   }
 }
@@ -93,6 +97,7 @@ export function regionKey(region: Region): string {
     region.dateFormat,
     region.weekStartsOn,
     region.chequeValidityMonths,
+    region.clearingDays,
   ].join('|')
 }
 

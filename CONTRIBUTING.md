@@ -53,12 +53,12 @@ docs(regions): add New Zealand
 - **UI:** build with the shadcn/ui components in `src/components/ui` and Tailwind. Match the existing look rather than adding new styles.
 - **No country is hardcoded.** Currency, number and date formats, time zone, week start and cheque rules come from the user's region. Use the helpers in `src/lib/formatters.ts` (`formatCurrency`, `formatDate`, `todayISO`, …) and never a fixed symbol, locale or date pattern. See [docs/regions.md](./docs/regions.md).
 - **Status changes go through the database.** Use the wrappers in `src/lib/updateChequeStatus.ts`, which call SQL functions such as `change_cheque_status` and `record_deposit`. Every change is then atomic and written to history. Don't update `cheques.status` directly from the client.
-- **Keep the transition rules in sync.** `VALID_STATUS_TRANSITIONS` in `src/types/index.ts` mirrors the checks in the SQL functions. If you change one, change the other.
+- **Keep the transition rules in sync.** `VALID_STATUS_TRANSITIONS` in `src/types/index.ts` (given cheques) and `RECEIVED_ACTIONS` in `src/types/received.ts` (received cheques) mirror the checks in the SQL functions. If you change one, change the other; `tests/received.test.ts` checks the received side.
 - **Plans are enforced in the database.** On the hosted edition, `has_write_access()` and row-level security decide who can write; the UI only reflects that. Never let the client write `entitlements` or `instance_config`. See [docs/editions.md](./docs/editions.md).
 
 ### Database changes
 
-- Add a new, numbered file in `supabase/migrations/` (the next one is `012_…`).
+- Add a new, numbered file in `supabase/migrations/` (the next one is `013_…`).
 - Keep migrations additive and backward compatible: new nullable or defaulted columns, and new functions. Self-hosted databases upgrade by applying new files in order.
 - The companion projects read the same database, so say so in the pull request if a change could affect either one:
   - [Cheque Watch](https://github.com/vikashpatel04/cheque-watch#compatibility) reads specific columns of `cheques` and `parties`

@@ -37,7 +37,7 @@ Users can read their own rows. Only the service role can create or change them: 
 
 ### Read-only accounts
 
-`has_write_access()` is true when billing is off, or when the signed-in user has an active entitlement. Restrictive row-level security policies on `parties`, `cheques`, `cheque_history` and `daily_deposits` require it for inserts, updates and deletes:
+`has_write_access()` is true when billing is off, or when the signed-in user has an active entitlement. Restrictive row-level security policies on `parties`, `cheques`, `cheque_history`, `daily_deposits`, `received_cheques`, `received_cheque_history` and `bank_accounts` require it for inserts, updates and deletes:
 - **Reads are never blocked.** A user whose plan ends keeps seeing and exporting everything.
 - **Settings stay writable.**
 - **Self-hosted instances are unaffected,** because `has_write_access()` is always true there.

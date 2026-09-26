@@ -3,8 +3,9 @@
  * can then be changed in Settings. Nothing else in the app assumes a country,
  * so supporting a new one means adding an entry here (see docs/regions.md).
  *
- * Cheque validity follows usual bank practice in each country. Confirm it, and
- * the suggested banks, with someone local before promoting the app there.
+ * Cheque validity and clearing times follow usual bank practice in each
+ * country. Confirm them, and the suggested banks, with someone local before
+ * promoting the app there.
  */
 
 export type DateFormat = 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd' | 'dd.MM.yyyy' | 'dd-MM-yyyy'
@@ -32,6 +33,8 @@ export interface RegionPreset {
   weekStartsOn: WeekStart
   /** Months after its date that a cheque stays valid before banks treat it as stale. */
   chequeValidityMonths: number
+  /** Days a deposited cheque usually takes to clear; after this the app asks if it did. */
+  clearingDays: number
   /** Suggested entries for the bank list. */
   banks: string[]
 }
@@ -46,6 +49,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'dd/MM/yyyy',
     weekStartsOn: 1,
     chequeValidityMonths: 3,
+    clearingDays: 2,
     banks: ['SBI', 'HDFC', 'ICICI', 'Bank of Baroda', 'Axis Bank', 'Kotak Mahindra', 'Punjab National Bank'],
   },
   {
@@ -56,6 +60,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'dd/MM/yyyy',
     weekStartsOn: 1,
     chequeValidityMonths: 6,
+    clearingDays: 2,
     banks: [],
   },
   {
@@ -66,6 +71,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'dd/MM/yyyy',
     weekStartsOn: 1,
     chequeValidityMonths: 6,
+    clearingDays: 2,
     banks: [],
   },
   {
@@ -76,6 +82,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'dd/MM/yyyy',
     weekStartsOn: 1,
     chequeValidityMonths: 6,
+    clearingDays: 2,
     banks: [],
   },
   {
@@ -97,6 +104,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'MM/dd/yyyy',
     weekStartsOn: 0,
     chequeValidityMonths: 6,
+    clearingDays: 2,
     banks: [],
   },
   {
@@ -115,6 +123,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'yyyy-MM-dd',
     weekStartsOn: 0,
     chequeValidityMonths: 6,
+    clearingDays: 2,
     banks: [],
   },
   {
@@ -133,6 +142,7 @@ export const REGION_PRESETS: RegionPreset[] = [
     dateFormat: 'dd/MM/yyyy',
     weekStartsOn: 1,
     chequeValidityMonths: 15,
+    clearingDays: 3,
     banks: [],
   },
 ]

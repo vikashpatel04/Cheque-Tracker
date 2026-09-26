@@ -6,10 +6,20 @@ import { brandSlug } from '@/config/brand'
 import { formatCurrencyCode, formatDate, todayDate } from './formatters'
 import { getActiveRegion } from './region'
 import { STATUS_LABELS, type Cheque, type Party, type ChequeHistory, type DailyDeposit } from '@/types'
+import {
+  RECEIVED_STATUS_LABELS,
+  SETTLEMENT_METHOD_LABELS,
+  type BankAccount,
+  type ReceivedCheque,
+  type ReceivedChequeHistory,
+} from '@/types/received'
 
 interface ExportCheque extends Cheque {
   party?: Party
 }
+
+/** A date column that may be empty. */
+const optionalDate = (d: string | null) => (d ? formatDate(d) : '')
 
 export function exportChequesToPDF(cheques: ExportCheque[], title: string) {
   const doc = new jsPDF({ orientation: 'landscape' })
@@ -60,13 +70,20 @@ export function exportChequesToExcel(cheques: ExportCheque[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-export function exportAllData(
-  parties: Party[],
-  cheques: ExportCheque[],
-  history: ChequeHistory[],
+export interface AllData {
+  parties: Party[]
+  cheques: ExportCheque[]
+  history: ChequeHistory[]
   deposits: DailyDeposit[]
-) {
+  received: ReceivedCheque[]
+  receivedHistory: ReceivedChequeHistory[]
+  accounts: BankAccount[]
+}
+
+/** Everything the user has, one sheet per kind of record. */
+export function exportAllData({ parties, cheques, history, deposits, received, receivedHistory, accounts }: AllData) {
   const wb = XLSX.utils.book_new()
+  const accountName = new Map(accounts.map((a) => [a.id, a.last4 ? `${a.name} (${a.last4})` : a.name]))
 
   XLSX.utils.book_append_sheet(
     wb,
@@ -100,7 +117,7 @@ export function exportAllData(
         Notes: c.notes,
       }))
     ),
-    'Cheques'
+    'Given cheques'
   )
 
   XLSX.utils.book_append_sheet(
@@ -115,7 +132,7 @@ export function exportAllData(
         Date: formatDate(h.created_at),
       }))
     ),
-    'History'
+    'Given history'
   )
 
   XLSX.utils.book_append_sheet(
@@ -127,7 +144,65 @@ export function exportAllData(
         Notes: d.notes,
       }))
     ),
-    'Deposits'
+    'Funds added'
+  )
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.json_to_sheet(
+      received.map((c) => ({
+        'Cheque No.': c.cheque_number,
+        Party: c.party?.name ?? '',
+        Kind: c.kind === 'SECURITY' ? 'Security' : 'Regular',
+        'Drawn On': c.bank_name,
+        Amount: c.amount == null ? '' : Number(c.amount),
+        'Received On': formatDate(c.received_on),
+        'Cheque Date': optionalDate(c.cheque_date),
+        'Due Date': formatDate(c.due_date),
+        Status: RECEIVED_STATUS_LABELS[c.status] ?? c.status,
+        'Deposited Into': c.deposit_account_id ? accountName.get(c.deposit_account_id) ?? '' : '',
+        'Deposited On': optionalDate(c.deposited_on),
+        'Cleared On': optionalDate(c.cleared_on),
+        'Bounced On': optionalDate(c.bounced_on),
+        'Bounce Reason': c.bounce_reason ?? '',
+        'Bank Charges': c.bank_charges == null ? '' : Number(c.bank_charges),
+        'Settled On': optionalDate(c.settled_on),
+        'Settled Via': c.settled_via ? SETTLEMENT_METHOD_LABELS[c.settled_via] : '',
+        'Settlement Ref': c.settlement_ref ?? '',
+        'Closed Because': c.close_reason ?? '',
+        'Times Deposited Again': c.redeposit_count,
+        Notes: c.notes ?? '',
+      }))
+    ),
+    'Received cheques'
+  )
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.json_to_sheet(
+      receivedHistory.map((h) => ({
+        'Cheque ID': h.cheque_id,
+        From: h.from_status,
+        To: h.to_status,
+        ChangedBy: h.changed_by,
+        Note: h.note,
+        Date: formatDate(h.created_at),
+      }))
+    ),
+    'Received history'
+  )
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.json_to_sheet(
+      accounts.map((a) => ({
+        Name: a.name,
+        Bank: a.bank_name,
+        'Last 4': a.last4 ?? '',
+        Default: a.is_default,
+      }))
+    ),
+    'Bank accounts'
   )
 
   XLSX.writeFile(wb, `${brandSlug()}_export.xlsx`)

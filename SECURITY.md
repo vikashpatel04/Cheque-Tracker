@@ -24,6 +24,8 @@ This is useful for reviewers and for anyone running their own copy:
 
 - The web app only uses the Supabase **publishable (anon) key**, which is public by design. Access to data is controlled by **row-level security**, so each signed-in user can only read and change their own rows. The schema is public too, so RLS is the whole boundary.
 - Status changes, deposits, re-present, write-off and rollback run as SQL functions with `SECURITY INVOKER`, so row-level security still applies. For app users, `cheque_history` is append-only.
+- For received cheques, a trigger only lets those functions change a status, and only they can write history. The trigger also checks that the party and bank account belong to the user, since foreign keys skip row-level security.
+- The `all_cheques` view is created with `security_invoker`, so it shows only the user's own rows.
 - **Plans (hosted edition):**
   - `instance_config` and `entitlements` can be read but never written through the API. Only the service role can change them.
   - When billing is on, restrictive policies make an account without an active entitlement read-only. See [docs/editions.md](./docs/editions.md).

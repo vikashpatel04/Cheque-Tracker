@@ -101,6 +101,8 @@ export interface Settings {
   date_format: DateFormat | null
   week_starts_on: WeekStart | null
   cheque_validity_months: number | null
+  /** Days a deposited cheque usually takes to clear. */
+  clearing_days: number | null
   created_at: string
   updated_at: string
 }
