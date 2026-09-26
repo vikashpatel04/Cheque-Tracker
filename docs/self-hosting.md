@@ -11,8 +11,8 @@ If you'd rather not run anything yourself, use the hosted version at [chequetrac
 ## 1. Get the code
 
 ```bash
-git clone https://github.com/vikashpatel04/chequetracker.git
-cd chequetracker
+git clone https://github.com/vikashpatel04/cheque-tracker.git
+cd cheque-tracker
 npm install
 cp .env.example .env.local
 ```
@@ -96,7 +96,7 @@ Vercel detects Vite, and `vercel.json` handles client-side routing and cache hea
 
 Apply any new migration files in order, then deploy the new version. Migrations are additive, so existing data is kept. Follow the release tags if you want stable versions.
 
-### From Cheque Tracker 1.x
+### From Cheque Tracker v0
 
 Your database already has migrations `001` to `009`.
 

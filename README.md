@@ -1,6 +1,6 @@
 # Cheque Tracker
 
-[![CI](https://github.com/vikashpatel04/chequetracker/actions/workflows/ci.yml/badge.svg)](https://github.com/vikashpatel04/chequetracker/actions/workflows/ci.yml)
+[![CI](https://github.com/vikashpatel04/cheque-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/vikashpatel04/cheque-tracker/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -19,7 +19,7 @@ It works in any country. Currency, number and date formats, time zone and cheque
 
 Both run the same code from this repository; only the configuration differs. [How one codebase serves both](./docs/editions.md).
 
-> **Status:** this is the next major version of Cheque Tracker and is in active development. Version 1 remains at [vikashpatel04/Cheque-Tracker](https://github.com/vikashpatel04/Cheque-Tracker) under the MIT License.
+> **Status:** this is the new version of Cheque Tracker and is in active development. The first version (v0) remains at [vikashpatel04/cheque-tracker-v0](https://github.com/vikashpatel04/cheque-tracker-v0) under the MIT License.
 
 **Contents:** [Features](#features) · [Cheque life cycle](#cheque-life-cycle) · [Roadmap](#roadmap) · [Self-hosting](#self-hosting) · [Companion projects](#companion-projects) · [Tech stack](#tech-stack) · [Project structure](#project-structure) · [Contributing](#contributing) · [License](#license)
 
@@ -92,14 +92,14 @@ RETURNED  ──► write off  ──► WRITTEN_OFF         (a replacement can 
 ## Self-hosting
 
 ```bash
-git clone https://github.com/vikashpatel04/chequetracker.git
-cd chequetracker
+git clone https://github.com/vikashpatel04/cheque-tracker.git
+cd cheque-tracker
 npm install
 cp .env.example .env.local   # add your Supabase URL and publishable key
 npm run dev
 ```
 
-Then apply the migrations in `supabase/migrations/` and create your login. The full guide, including auto-pass, deployment and upgrading from version 1, is in [docs/self-hosting.md](./docs/self-hosting.md).
+Then apply the migrations in `supabase/migrations/` and create your login. The full guide, including auto-pass, deployment and upgrading from v0, is in [docs/self-hosting.md](./docs/self-hosting.md).
 
 ---
 

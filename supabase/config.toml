@@ -1,4 +1,4 @@
-project_id = "chequetracker"
+project_id = "cheque-tracker"
 
 [api]
 enabled = true

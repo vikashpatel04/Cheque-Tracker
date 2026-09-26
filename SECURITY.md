@@ -11,7 +11,7 @@ Only the latest `main` branch and the latest release are supported. Please make 
 **Please don't open a public issue.** Report it privately through GitHub instead:
 
 1. Go to the repository's **Security** tab.
-2. Click **Report a vulnerability** (or use [this link](https://github.com/vikashpatel04/chequetracker/security/advisories/new)).
+2. Click **Report a vulnerability** (or use [this link](https://github.com/vikashpatel04/cheque-tracker/security/advisories/new)).
 3. Describe the problem, how to reproduce it, and what could be affected.
 
 You should get a reply within 7 days. Once there's a fix, we'll agree on when to disclose it, and you'll be credited unless you'd rather not be.

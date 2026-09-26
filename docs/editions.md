@@ -107,7 +107,7 @@ values ('<auth user id>', 'purchase', now() + interval '6 months', '<payment id>
 ## Releases and upgrades
 
 - Migrations are numbered and additive, so any self-hosted database can upgrade by applying new files in order. CI applies all of them on every pull request.
-- Tag releases (`v2.0.0`, `v2.1.0`, …) with notes. Self-hosters upgrade from tags; the hosted edition deploys `main` or the latest tag.
+- Tag releases (`v1.0.0`, `v1.1.0`, …) with notes. Self-hosters upgrade from tags; the hosted edition deploys `main` or the latest tag.
 - The cheque-mcp and Cheque Watch companions read the same tables. Schema changes must not break them, or they must ship alongside an update to them.
 
 ## Licence obligations (AGPL-3.0)

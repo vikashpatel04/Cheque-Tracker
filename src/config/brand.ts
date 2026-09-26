@@ -15,7 +15,7 @@ export const brand = {
    * 13) requires offering it to everyone who uses a modified copy over a
    * network, so forks should point this at their own repository.
    */
-  sourceUrl: env.VITE_SOURCE_URL || 'https://github.com/vikashpatel04/chequetracker',
+  sourceUrl: env.VITE_SOURCE_URL || 'https://github.com/vikashpatel04/cheque-tracker',
   license: 'AGPL-3.0',
 }
 
