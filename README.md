@@ -146,7 +146,7 @@ src/
   lib/              Supabase client, region and formatters, RPC wrappers, allocation, exports
   types/            app and database types
 supabase/
-  migrations/       001–012: schema, RLS, functions, regions, editions, received cheques
+  migrations/       001–014: schema, RLS, functions, regions, editions, received cheques, grants
   functions/        auto-pass Edge Function
 tests/              formatter, schedule and migration/RLS tests
 docs/               editions, self-hosting, regions, received cheques
